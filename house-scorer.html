@@ -976,7 +976,8 @@ async function autoLoadListings() {
 document.addEventListener('keydown', e => { if(e.key==='Escape' && mode==='form') cancelForm(); });
 showEmpty();
 autoLoadListings().then(() => {
-  // Always open to compare table view by default
+  toggleCompare();
+}).catch(() => {
   toggleCompare();
 });
 </script>
