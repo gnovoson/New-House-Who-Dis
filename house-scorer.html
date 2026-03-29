@@ -907,9 +907,75 @@ function exitCompareToDetail(id) {
   viewDetail(id);
 }
 
+// ===== AUTO-LOAD JSON FROM SAME FOLDER =====
+// When hosted on GitHub Pages (or any web server), automatically fetch
+// listing JSON files from the same directory. Silently skips if not found.
+const AUTO_LOAD_FILES = [
+  'redfin_listings_enriched.json',
+  'redfin_listings.json',
+];
+
+async function autoLoadListings() {
+  // Only auto-load if we have no listings yet (don't overwrite manual edits)
+  if (listings.length > 0) return;
+
+  for (const filename of AUTO_LOAD_FILES) {
+    try {
+      const resp = await fetch(filename);
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      if (!Array.isArray(data) || data.length === 0) continue;
+
+      let imported = 0, skipped = 0;
+      for (const item of data) {
+        const addr = item.address || item.shortAddress || '';
+        if (addr && listings.some(l => l.address === addr)) { skipped++; continue; }
+        const listing = {
+          id: item.id || 'h-' + Date.now() + '-' + Math.random().toString(36).slice(2,6),
+          address: addr,
+          url: item.url || '',
+          townId: matchTownId(item.town || ''),
+          price: item.price || 0,
+          bedrooms: item.bedrooms || item.beds || 0,
+          offices: item.offices || 0,
+          bathsFull: item.bathsFull || item.baths || 0,
+          bathsHalf: item.bathsHalf || 0,
+          sqft: item.sqft || 0,
+          yearBuilt: item.yearBuilt || 0,
+          lotSize: item.lotAcres || 0,
+          heatingType: item.heatingType || item.heating || '',
+          centralAir: item.centralAir != null ? item.centralAir : false,
+          garageSpaces: item.garageSpaces || item.garage || 0,
+          garageAttached: item.garageAttached || false,
+          kitchenRating: item.kitchenRating || 50,
+          entertainingRating: item.entertainingRating || 50,
+          renoRating: item.renoRating || 50,
+          streetRating: item.streetRating || 50,
+          openHouseStart: item.openHouseStart || '',
+          openHouseEnd: item.openHouseEnd || '',
+          notes: item.notes || [item.daysOnMarket ? `${item.daysOnMarket} days on market.` : '', item.propertyType || '', item.hoa ? `HOA: ${item.hoa}` : ''].filter(Boolean).join(' | '),
+        };
+        listings.push(listing);
+        imported++;
+      }
+      if (imported > 0) {
+        save();
+        renderSidebar();
+        console.log(`Auto-loaded ${imported} listings from ${filename}`);
+        showEmpty();
+        return; // stop after first successful load
+      }
+    } catch(e) {
+      // Silently skip — file not available (local file:// or not deployed yet)
+      continue;
+    }
+  }
+}
+
 // Init
 document.addEventListener('keydown', e => { if(e.key==='Escape' && mode==='form') cancelForm(); });
 showEmpty();
+autoLoadListings();
 </script>
 </body>
 </html>
