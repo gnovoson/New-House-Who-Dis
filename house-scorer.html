@@ -762,7 +762,7 @@ function importListings(input) {
 }
 
 // ===== COMPARISON TABLE =====
-let compareVisible = false;
+let compareVisible = true;
 let sortCol = 'houseScore';
 let sortDir = -1; // -1 = descending
 
@@ -975,7 +975,11 @@ async function autoLoadListings() {
 // Init
 document.addEventListener('keydown', e => { if(e.key==='Escape' && mode==='form') cancelForm(); });
 showEmpty();
-autoLoadListings();
+// Default to compare table view
+document.getElementById('btn-compare').textContent = 'Card View';
+document.querySelector('.main').classList.add('hidden');
+document.getElementById('compare-view').classList.add('active');
+autoLoadListings().then(() => { if(compareVisible) renderCompareTable(); });
 </script>
 </body>
 </html>
