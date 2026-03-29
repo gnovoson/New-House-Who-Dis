@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Listing Scraper Bookmarklet — Setup</title>
+<style>
+  :root { --bg: #0f1117; --surface: #1a1d27; --border: #2e3345; --text: #e4e6f0; --dim: #8b8fa3; --accent: #6c7bff; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Inter',-apple-system,sans-serif; background:var(--bg); color:var(--text); padding:40px; max-width:800px; margin:0 auto; }
+  h1 { font-size:24px; margin-bottom:8px; } h1 span { color:var(--accent); }
+  .subtitle { color:var(--dim); font-size:14px; margin-bottom:32px; }
+  .step { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:16px; }
+  .step h3 { font-size:15px; margin-bottom:10px; }
+  .step p { font-size:13px; color:var(--dim); line-height:1.6; }
+  .bookmarklet-link { display:inline-block; margin:16px 0; padding:12px 24px; background:var(--accent); color:#fff; border-radius:8px; font-size:14px; font-weight:600; text-decoration:none; cursor:grab; }
+  .bookmarklet-link:hover { background:#5a6ae8; }
+  code { background:var(--surface); padding:2px 6px; border-radius:4px; font-size:12px; color:var(--accent); }
+  .note { font-size:12px; color:var(--dim); margin-top:12px; padding:10px; background:rgba(108,123,255,.08); border-radius:6px; border-left:3px solid var(--accent); }
+</style>
+</head>
+<body>
+<h1><span>Listing</span> Scraper</h1>
+<p class="subtitle">A bookmarklet that extracts property details from Redfin and Zillow listing pages.</p>
+
+<div class="step">
+  <h3>Step 1: Drag this to your bookmarks bar</h3>
+  <p>Click and drag the button below to your browser's bookmarks bar. If you don't see the bookmarks bar, press <code>Ctrl+Shift+B</code> (Windows) or <code>Cmd+Shift+B</code> (Mac).</p>
+
+  <a class="bookmarklet-link" href="javascript:void(function(){try{var d=document,h=location.hostname,data={url:location.href,_source:'bookmarklet',_fetched:new Date().toISOString()};if(h.includes('redfin.com')){var gv=function(label){var els=d.querySelectorAll('.keyDetail--text, .entryItemContent, .amenity-group .entryItemContent, [data-rf-test-id]');for(var i=0;i<els.length;i++){var t=els[i].textContent.trim();if(t.toLowerCase().includes(label.toLowerCase()))return t}var tds=d.querySelectorAll('.table-row td, .super-group-content .entryItemContent');for(var i=0;i<tds.length;i++){var p=tds[i].previousElementSibling||tds[i].parentElement;if(p&&p.textContent.toLowerCase().includes(label.toLowerCase()))return tds[i].textContent.trim()}return''};var price=d.querySelector('[data-rf-test-id=abp-price] span, .statsValue [data-rf-test-id=abp-price], .price-section .statsValue');data.price=price?parseInt(price.textContent.replace(/[^0-9]/g,'')):0;var stats=d.querySelectorAll('.HomeMainStats .stat-block, .home-main-stats-variant .stat-block, [data-rf-test-id=abp-beds], [data-rf-test-id=abp-baths], [data-rf-test-id=abp-sqFt]');var statsText=d.querySelector('.HomeMainStats, .home-main-stats-variant, .HomeInfoV2');if(statsText){var st=statsText.textContent;var bedsM=st.match(/(\d+)\s*[Bb]eds?/);var bathsM=st.match(/([\d.]+)\s*[Bb]aths?/);var sqftM=st.match(/([\d,]+)\s*[Ss]q\.?\s*[Ff]t/);data.bedrooms=bedsM?parseInt(bedsM[1]):0;var b=bathsM?parseFloat(bathsM[1]):0;data.bathsFull=Math.floor(b);data.bathsHalf=b%1>=0.4?1:0;data.sqft=sqftM?parseInt(sqftM[1].replace(/,/g,'')):0}var addr=d.querySelector('[data-rf-test-id=abp-streetLine] .street-address, .street-address, h1.homeAddress');data.address=addr?addr.textContent.trim():'';var city=d.querySelector('[data-rf-test-id=abp-cityStateZip], .dp-subtext .cityStateZip');if(city)data.address+=(data.address?', ':'')+city.textContent.trim();var allText=d.body.innerText;var yearM=allText.match(/[Bb]uilt\s*(?:in\s*)?(\d{4})/);data.yearBuilt=yearM?parseInt(yearM[1]):0;var heatM=allText.match(/[Hh]eat(?:ing)?\s*(?:[Tt]ype)?[\s:]+([^\n,]+)/);if(heatM){var ht=heatM[1].toLowerCase();data.heatingType=ht.includes('gas')||ht.includes('natural gas')?'gas':ht.includes('oil')?'oil':ht.includes('heat pump')?'heatpump':ht.includes('electric')?'electric':'other'}var coolM=allText.match(/[Cc]ool(?:ing)?[\s:]+([^\n,]+)/);if(coolM){var ct=coolM[1].toLowerCase();data.centralAir=ct.includes('central')||ct.includes('a/c')||ct.includes('air condition')}else{data.centralAir=allText.toLowerCase().includes('central air')}var garageM=allText.match(/[Gg]arage\s*[Ss]paces?\s*[:]*\s*(\d+)/);if(!garageM)garageM=allText.match(/(\d+)\s*[Cc]ar\s*[Gg]arage/);data.garageSpaces=garageM?parseInt(garageM[1]):allText.toLowerCase().includes('garage')?1:0;data.garageAttached=allText.toLowerCase().includes('attached garage')||allText.toLowerCase().includes('att. garage');var lotM=allText.match(/([\d,.]+)\s*[Aa]cres?/);if(lotM)data.lotAcres=parseFloat(lotM[1].replace(/,/g,''));else{var lotSqM=allText.match(/[Ll]ot\s*[Ss]ize[\s:]+\s*([\d,]+)\s*(?:sq|sf)/i);if(lotSqM)data.lotAcres=Math.round(parseInt(lotSqM[1].replace(/,/g,''))/43560*100)/100}var ohEl=d.querySelector('.open-house-banner, .OpenHouseInfo, [data-rf-test-id=open-house-label]');if(ohEl)data.openHouseInfo=ohEl.textContent.trim();data.town=d.querySelector('[data-rf-test-id=abp-cityStateZip]')?d.querySelector('[data-rf-test-id=abp-cityStateZip]').textContent.split(',')[0].trim():''}else if(h.includes('zillow.com')){var zPrice=d.querySelector('[data-testid=price] span, .summary-container [data-testid=price]');data.price=zPrice?parseInt(zPrice.textContent.replace(/[^0-9]/g,'')):0;var zSummary=d.querySelector('.summary-container, [data-testid=bed-bath-beyond]');if(zSummary){var zt=zSummary.textContent;var zBeds=zt.match(/(\d+)\s*bd/i);var zBaths=zt.match(/([\d.]+)\s*ba/i);var zSqft=zt.match(/([\d,]+)\s*sqft/i);data.bedrooms=zBeds?parseInt(zBeds[1]):0;var zb=zBaths?parseFloat(zBaths[1]):0;data.bathsFull=Math.floor(zb);data.bathsHalf=zb%1>=0.4?1:0;data.sqft=zSqft?parseInt(zSqft[1].replace(/,/g,'')):0}var zAddr=d.querySelector('[data-testid=bdp-hero-header] h1, .summary-container h1');data.address=zAddr?zAddr.textContent.trim():'';var zAll=d.body.innerText;var zYear=zAll.match(/[Bb]uilt\s*(?:in\s*)?(\d{4})/);data.yearBuilt=zYear?parseInt(zYear[1]):0;var zHeat=zAll.match(/[Hh]eat(?:ing)?\s*(?:[Tt]ype)?[\s:]+([^\n,]+)/);if(zHeat){var zht=zHeat[1].toLowerCase();data.heatingType=zht.includes('gas')?'gas':zht.includes('oil')?'oil':zht.includes('heat pump')?'heatpump':zht.includes('electric')?'electric':'other'}data.centralAir=zAll.toLowerCase().includes('central air')||zAll.toLowerCase().includes('central a/c');var zGarage=zAll.match(/(\d+)\s*[Cc]ar\s*[Gg]arage/);if(!zGarage)zGarage=zAll.match(/[Gg]arage\s*[Ss]paces?\s*[:]*\s*(\d+)/);data.garageSpaces=zGarage?parseInt(zGarage[1]):zAll.toLowerCase().includes('garage')?1:0;data.garageAttached=zAll.toLowerCase().includes('attached');var zCity=data.address.split(',');if(zCity.length>=2)data.town=zCity[zCity.length-2].trim()}else{alert('This bookmarklet works on Redfin and Zillow listing pages.');return}var json=JSON.stringify(data,null,2);navigator.clipboard.writeText(json).then(function(){var popup=d.createElement('div');popup.style.cssText='position:fixed;top:20px;right:20px;background:#1a1d27;color:#e4e6f0;border:2px solid #6c7bff;border-radius:12px;padding:20px;z-index:999999;font-family:Inter,sans-serif;font-size:13px;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,.5)';popup.innerHTML='<div style=\"font-size:16px;font-weight:700;margin-bottom:8px;color:#6c7bff\">✓ Copied to clipboard!</div>'+'<div style=\"margin-bottom:8px\">'+data.address+'</div>'+'<div style=\"color:#8b8fa3;font-size:12px\">'+(data.price?'$'+data.price.toLocaleString():'?')+' · '+(data.bedrooms||'?')+'bd/'+(data.bathsFull||'?')+'ba · '+(data.sqft?data.sqft.toLocaleString()+'sf':'?sf')+' · '+(data.yearBuilt||'?')+'</div>'+'<div style=\"color:#8b8fa3;font-size:12px;margin-top:4px\">'+'Heat: '+(data.heatingType||'?')+' · AC: '+(data.centralAir?'Yes':'?')+' · Garage: '+(data.garageSpaces||'?')+'</div>'+'<div style=\"color:#8b8fa3;font-size:11px;margin-top:8px\">Paste into House Scorer → Import JSON</div>';d.body.appendChild(popup);setTimeout(function(){popup.remove()},5000)}).catch(function(){prompt('Copy this JSON:',json)})}catch(e){alert('Scraper error: '+e.message)}}());">📋 Grab Listing</a>
+
+  <p style="margin-top:12px;font-size:12px;color:var(--dim);">Can't drag? Right-click → "Bookmark this link" → save to bookmarks bar.</p>
+</div>
+
+<div class="step">
+  <h3>Step 2: Browse listings on Redfin or Zillow</h3>
+  <p>Navigate to any property listing page on <code>redfin.com</code> or <code>zillow.com</code>.</p>
+</div>
+
+<div class="step">
+  <h3>Step 3: Click the bookmarklet</h3>
+  <p>Click "📋 Grab Listing" in your bookmarks bar. It will:</p>
+  <p style="margin-top:8px;">
+    1. Read the page for price, beds, baths, sqft, year built, heating, AC, garage, open house info<br>
+    2. Copy structured JSON to your clipboard<br>
+    3. Show a confirmation popup with what it found
+  </p>
+</div>
+
+<div class="step">
+  <h3>Step 4: Import into House Scorer</h3>
+  <p>Open <code>house-scorer.html</code>, click <strong>"Import JSON"</strong>, but instead of selecting a file:</p>
+  <p style="margin-top:8px;">
+    1. Create a <code>.json</code> file — open Notepad, paste the clipboard contents, save as <code>listing.json</code><br>
+    2. Or use the <strong>"Paste Listing"</strong> button (being added to House Scorer) to paste directly
+  </p>
+</div>
+
+<div class="note">
+  <strong>What it captures:</strong> address, price, beds, baths, sqft, year built, heating type, central air, garage spaces, attached/detached, lot size, open house info, listing URL, town name.<br><br>
+  <strong>What you still rate manually:</strong> kitchen quality, entertaining space, renovation quality, street/setting — the subjective stuff.
+</div>
+
+<div class="step" style="margin-top:24px;">
+  <h3>Supported sites</h3>
+  <p>
+    <strong>Redfin</strong> — full support (price, beds, baths, sqft, year, heating, AC, garage, lot, open house)<br>
+    <strong>Zillow</strong> — full support (same fields)<br>
+    <strong>Others</strong> — not yet, but can be added
+  </p>
+</div>
+</body>
+</html>

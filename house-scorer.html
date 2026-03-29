@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>House Scorer</title>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #232736; --border: #2e3345;
+    --text: #e4e6f0; --text-dim: #8b8fa3; --accent: #6c7bff; --accent-glow: rgba(108,123,255,0.15);
+    --green: #34d399; --red: #f87171; --yellow: #fbbf24; --purple: #c084fc;
+    --tier-s: #ff6b9d; --tier-a: #c084fc; --tier-b: #6c7bff; --tier-c: #38bdf8;
+    --tier-d: #34d399; --tier-e: #fbbf24; --tier-f: #f87171;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  .app-header { padding:20px 32px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .app-header h1 { font-size:22px; font-weight:700; letter-spacing:-0.5px; }
+  .app-header h1 span { color:var(--accent); }
+  .header-actions { display:flex; gap:10px; }
+  .btn { padding:8px 16px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer; transition:all .2s; }
+  .btn:hover { background:var(--surface2); border-color:var(--accent); }
+  .btn-primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn-primary:hover { background:#5a6ae8; }
+  .btn-danger { border-color:var(--red); color:var(--red); }
+  .btn-danger:hover { background:rgba(248,113,113,.1); }
+
+  .main { display:flex; height:calc(100vh - 65px); }
+
+  /* Left panel: listing list */
+  .sidebar { width:320px; border-right:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; }
+  .sidebar-header { padding:16px; border-bottom:1px solid var(--border); }
+  .sidebar-header h3 { font-size:13px; text-transform:uppercase; letter-spacing:1px; color:var(--text-dim); margin-bottom:10px; }
+  .listing-list { flex:1; overflow-y:auto; padding:8px; }
+  .listing-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:8px; cursor:pointer; transition:all .2s; }
+  .listing-card:hover { border-color:var(--accent); transform:translateY(-1px); }
+  .listing-card.active { border-color:var(--accent); background:var(--accent-glow); }
+  .listing-card .address { font-size:14px; font-weight:600; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .listing-card .meta { font-size:12px; color:var(--text-dim); display:flex; gap:12px; margin-bottom:8px; }
+  .listing-card .scores-row { display:flex; gap:8px; align-items:center; }
+  .score-pill { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:6px; font-size:12px; font-weight:600; }
+  .score-pill .label { font-weight:400; color:var(--text-dim); margin-right:2px; }
+  .must-have-flags { display:flex; gap:4px; margin-top:6px; flex-wrap:wrap; }
+  .flag { font-size:10px; padding:2px 6px; border-radius:3px; font-weight:600; }
+  .flag-pass { background:rgba(52,211,153,.15); color:var(--green); }
+  .flag-fail { background:rgba(248,113,113,.15); color:var(--red); }
+  .flag-warn { background:rgba(251,191,36,.15); color:var(--yellow); }
+
+  /* Right panel: form or detail */
+  .content { flex:1; overflow-y:auto; padding:28px 32px; }
+
+  /* Form styles */
+  .form-section { margin-bottom:28px; }
+  .form-section h3 { font-size:14px; font-weight:600; margin-bottom:14px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+  .form-row { display:flex; gap:16px; margin-bottom:14px; flex-wrap:wrap; }
+  .form-field { display:flex; flex-direction:column; gap:4px; min-width:160px; flex:1; }
+  .form-field label { font-size:12px; color:var(--text-dim); font-weight:500; }
+  .form-field input, .form-field select, .form-field textarea { padding:8px 12px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:13px; font-family:inherit; }
+  .form-field input:focus, .form-field select:focus, .form-field textarea:focus { outline:none; border-color:var(--accent); }
+  .form-field textarea { resize:vertical; min-height:60px; }
+  .form-field input[type="range"] { padding:0; margin-top:4px; accent-color:var(--accent); }
+
+  .rating-group { display:flex; flex-direction:column; gap:4px; }
+  .rating-group label { font-size:12px; color:var(--text-dim); font-weight:500; }
+  .rating-row { display:flex; align-items:center; gap:10px; }
+  .rating-row input[type="range"] { flex:1; accent-color:var(--accent); }
+  .rating-row .val { font-size:14px; font-weight:700; color:var(--accent); min-width:28px; text-align:right; }
+
+  .toggle-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
+  .toggle-row label { font-size:13px; cursor:pointer; }
+  input[type="checkbox"].toggle { width:18px; height:18px; accent-color:var(--accent); cursor:pointer; }
+
+  /* Score detail view */
+  .detail-scores { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px; }
+  .score-big-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; text-align:center; }
+  .score-big-card .label { font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
+  .score-big-card .value { font-size:42px; font-weight:800; }
+  .score-big-card .tier { font-size:14px; margin-top:4px; }
+
+  .breakdown-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; margin-bottom:10px; overflow:hidden; }
+  .breakdown-header { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; cursor:pointer; }
+  .breakdown-header:hover { background:var(--surface2); }
+  .breakdown-header .left { display:flex; align-items:center; gap:8px; }
+  .breakdown-header .cat-name { font-size:14px; font-weight:600; }
+  .breakdown-header .cat-weight { font-size:11px; color:var(--text-dim); background:var(--surface2); padding:2px 8px; border-radius:4px; }
+  .breakdown-header .score { font-size:16px; font-weight:700; }
+  .breakdown-body { display:none; padding:0 16px 14px; font-size:13px; color:var(--text-dim); line-height:1.6; }
+  .breakdown-card.open .breakdown-body { display:block; }
+
+  .must-have-section { margin-bottom:24px; }
+  .must-have-row { display:flex; align-items:center; gap:10px; padding:8px 0; font-size:13px; border-bottom:1px solid var(--border); }
+  .must-have-row:last-child { border:none; }
+  .must-have-icon { font-size:16px; min-width:24px; text-align:center; }
+
+  .empty-state { text-align:center; padding:80px 40px; color:var(--text-dim); }
+  .empty-state h2 { font-size:20px; color:var(--text); margin-bottom:12px; }
+  .empty-state p { font-size:14px; line-height:1.6; max-width:400px; margin:0 auto; }
+
+  .url-link { color:var(--accent); text-decoration:none; font-size:13px; }
+  .url-link:hover { text-decoration:underline; }
+
+  /* Comparison table */
+  .compare-view { display:none; height:calc(100vh - 65px); overflow:auto; }
+  .compare-view.active { display:block; }
+  .main.hidden { display:none; }
+
+  .compare-table { border-collapse:collapse; width:100%; font-size:12px; }
+  .compare-table th, .compare-table td { padding:7px 10px; border:1px solid var(--border); text-align:center; white-space:nowrap; }
+  .compare-table th { background:var(--surface2); color:var(--text-dim); font-weight:600; text-transform:uppercase; letter-spacing:.5px; font-size:10px; cursor:pointer; user-select:none; position:sticky; top:0; z-index:2; }
+  .compare-table th:hover { background:var(--accent-glow); color:var(--text); }
+  .compare-table th .sort-arrow { margin-left:3px; font-size:9px; opacity:.5; }
+  .compare-table th.sorted .sort-arrow { opacity:1; color:var(--accent); }
+  .compare-table td:first-child { text-align:left; font-weight:600; max-width:220px; overflow:hidden; text-overflow:ellipsis; position:sticky; left:0; background:var(--surface); z-index:1; }
+  .compare-table th:first-child { position:sticky; left:0; z-index:3; }
+  .compare-table tr:hover td { background:var(--accent-glow); }
+  .compare-table .score-cell { font-weight:700; }
+  .compare-table .must-pass { color:var(--green); }
+  .compare-table .must-fail { color:var(--red); font-weight:700; }
+  .compare-table .tier-badge { display:inline-block; padding:1px 7px; border-radius:4px; font-weight:700; font-size:11px; }
+
+  @media(max-width:900px) { .sidebar { width:100%; max-height:200px; } .main { flex-direction:column; } }
+</style>
+</head>
+<body>
+<div class="app-header">
+  <h1><span>House</span>Scorer</h1>
+  <div class="header-actions">
+    <button class="btn" id="btn-compare" onclick="toggleCompare()">Compare Table</button>
+    <button class="btn" onclick="exportListings()">Export JSON</button>
+    <button class="btn" onclick="document.getElementById('import-file').click()">Import File</button>
+    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importListings(this)">
+    <button class="btn" onclick="pasteFromClipboard()" title="Paste JSON from bookmarklet">📋 Paste Listing</button>
+    <button class="btn btn-primary" onclick="showAddForm()">+ Add Listing</button>
+    <button class="btn btn-danger" onclick="clearAllListings()">Clear All</button>
+  </div>
+</div>
+<div class="main">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h3>Listings (<span id="listing-count">0</span>)</h3>
+      <div style="font-size:12px;color:var(--text-dim);">Click a listing to view details, or add a new one.</div>
+    </div>
+    <div class="listing-list" id="listing-list"></div>
+  </div>
+  <div class="content" id="content"></div>
+</div>
+<div class="compare-view" id="compare-view"></div>
+
+<script>
+// ===== TOWN SCORES (from Stage 1) =====
+const TOWN_SCORES = {"newton":{"name":"Newton","composite":82.5,"tier":"S","county":"Middlesex"},"arlington":{"name":"Arlington","composite":82.1,"tier":"S","county":"Middlesex"},"belmont":{"name":"Belmont","composite":80.0,"tier":"S","county":"Middlesex"},"milton":{"name":"Milton","composite":79.0,"tier":"S","county":"Norfolk County"},"dedham":{"name":"Dedham","composite":76.0,"tier":"A","county":"Middlesex/Norfolk"},"needham":{"name":"Needham","composite":73.8,"tier":"A","county":"Norfolk"},"wellesley":{"name":"Wellesley","composite":73.4,"tier":"A","county":"Norfolk"},"hingham":{"name":"Hingham","composite":71.7,"tier":"B","county":"Plymouth County"},"watertown":{"name":"Watertown","composite":71.5,"tier":"B","county":"Middlesex"},"westwood":{"name":"Westwood","composite":70.5,"tier":"B","county":"Norfolk"},"natick":{"name":"Natick","composite":69.8,"tier":"B","county":"Middlesex"},"duxbury":{"name":"Duxbury","composite":68.8,"tier":"B","county":"Plymouth"},"franklin":{"name":"Franklin","composite":68.6,"tier":"B","county":"Norfolk"},"scituate":{"name":"Scituate","composite":68.3,"tier":"B","county":"Plymouth"},"quincy":{"name":"Quincy","composite":67.8,"tier":"B","county":"Norfolk"},"canton":{"name":"Canton","composite":67.7,"tier":"B","county":"Norfolk County"},"hanover":{"name":"Hanover","composite":67.4,"tier":"B","county":"Plymouth"},"waltham":{"name":"Waltham","composite":66.9,"tier":"B","county":"Middlesex"},"braintree":{"name":"Braintree","composite":66.7,"tier":"B","county":"Norfolk"},"walpole":{"name":"Walpole","composite":66.4,"tier":"B","county":"Norfolk County"},"medfield":{"name":"Medfield","composite":66.1,"tier":"B","county":"Norfolk"},"dover":{"name":"Dover","composite":65.8,"tier":"C","county":"Norfolk"},"weston":{"name":"Weston","composite":65.6,"tier":"C","county":"Middlesex"},"norwood":{"name":"Norwood","composite":65.4,"tier":"C","county":"Norfolk County"},"norfolk":{"name":"Norfolk","composite":65.3,"tier":"C","county":"Norfolk"},"cohasset":{"name":"Cohasset","composite":65.0,"tier":"C","county":"Norfolk"},"sharon":{"name":"Sharon","composite":64.6,"tier":"C","county":"Norfolk County"},"foxborough":{"name":"Foxborough","composite":64.4,"tier":"C","county":"Norfolk"},"sherborn":{"name":"Sherborn","composite":64.0,"tier":"C","county":"Norfolk"},"marshfield":{"name":"Marshfield","composite":63.7,"tier":"C","county":"Plymouth"},"medway":{"name":"Medway","composite":63.4,"tier":"C","county":"Norfolk"},"randolph":{"name":"Randolph","composite":63.0,"tier":"C","county":"Norfolk"},"mansfield":{"name":"Mansfield","composite":62.7,"tier":"C","county":"Bristol"},"weymouth":{"name":"Weymouth","composite":62.0,"tier":"C","county":"Norfolk"},"holliston":{"name":"Holliston","composite":62.0,"tier":"C","county":"Middlesex"},"rockland":{"name":"Rockland","composite":60.8,"tier":"C","county":"Plymouth"},"bridgewater":{"name":"Bridgewater","composite":60.5,"tier":"C","county":"Plymouth"},"avon":{"name":"Avon","composite":60.2,"tier":"C","county":"Norfolk"},"hopkinton":{"name":"Hopkinton","composite":60.0,"tier":"C","county":"Middlesex/Worcester"},"framingham":{"name":"Framingham","composite":59.5,"tier":"D","county":"Middlesex"},"hull":{"name":"Hull","composite":58.7,"tier":"D","county":"Plymouth"},"abington":{"name":"Abington","composite":58.2,"tier":"D","county":"Plymouth"},"norwell":{"name":"Norwell","composite":57.5,"tier":"D","county":"Plymouth County"},"ashland":{"name":"Ashland","composite":57.4,"tier":"D","county":"Middlesex"},"whitman":{"name":"Whitman","composite":57.3,"tier":"D","county":"Plymouth"},"millis":{"name":"Millis","composite":57.0,"tier":"D","county":"Norfolk"},"holbrook":{"name":"Holbrook","composite":56.3,"tier":"D","county":"Norfolk"},"stoughton":{"name":"Stoughton","composite":56.2,"tier":"D","county":"Norfolk County"},"grafton":{"name":"Grafton","composite":55.6,"tier":"D","county":"Worcester"},"easton":{"name":"Easton","composite":55.6,"tier":"D","county":"Bristol County"},"plainville":{"name":"Plainville","composite":54.1,"tier":"D","county":"Norfolk"},"wrentham":{"name":"Wrentham","composite":50.8,"tier":"E","county":"Norfolk"},"upton":{"name":"Upton","composite":50.6,"tier":"E","county":"Worcester"},"raynham":{"name":"Raynham","composite":48.2,"tier":"E","county":"Bristol"},"attleboro":{"name":"Attleboro","composite":47.1,"tier":"F","county":"Bristol"},"bellingham":{"name":"Bellingham","composite":40.3,"tier":"F","county":"Norfolk"}};
+
+// ===== HOUSE SCORING CONFIG =====
+const HOUSE_CATS = [
+  { id:'price', label:'Price vs Budget', weight:20 },
+  { id:'size', label:'Size', weight:15 },
+  { id:'kitchen', label:'Kitchen Quality', weight:15 },
+  { id:'entertaining', label:'Entertaining Space', weight:12 },
+  { id:'age', label:'Age & Condition', weight:12 },
+  { id:'heating', label:'Heating & Systems', weight:8 },
+  { id:'street', label:'Street & Setting', weight:10 },
+  { id:'garage', label:'Garage & Parking', weight:8 }
+];
+
+const MUST_HAVES = [
+  { id:'hasGarage', label:'Garage (≥1 space)', check: h => h.garageSpaces >= 1 },
+  { id:'hasRooms', label:'4 bed OR 3 bed + 2 office', check: h => h.bedrooms >= 4 || (h.bedrooms >= 3 && h.offices >= 2) },
+  { id:'hasBaths', label:'≥2 bathrooms', check: h => h.bathsFull + h.bathsHalf * 0.5 >= 2 },
+  { id:'hasCentralAir', label:'Central air', check: h => h.centralAir },
+  { id:'notPreWar', label:'Built after 1940', check: h => !h.yearBuilt || h.yearBuilt >= 1940 }
+];
+
+let listings = [];
+try { listings = JSON.parse(localStorage.getItem('houseScorer') || '[]'); } catch(e) { listings = []; }
+// Fallback: in-memory if localStorage not available
+let activeId = null;
+let mode = 'empty'; // 'empty', 'form', 'detail'
+let editingId = null;
+
+// ===== SCORING ENGINE =====
+function scorePrice(h) {
+  const p = h.price;
+  if (!p) return 50;
+  if (p >= 900000 && p <= 1100000) return 95;
+  if (p >= 1100000 && p <= 1250000) return 85;
+  if (p >= 800000 && p < 900000) return 78;
+  if (p >= 700000 && p < 800000) return 68;
+  if (p > 1250000 && p <= 1400000) return 65;
+  if (p > 1400000) return 30;
+  if (p < 700000) return 55;
+  return 50;
+}
+function scoreSize(h) {
+  const s = h.sqft;
+  if (!s) return 50;
+  if (s >= 2800) return 95;
+  if (s >= 2500) return 88;
+  if (s >= 2200) return 75;
+  if (s >= 2000) return 65;
+  if (s >= 1800) return 50;
+  if (s >= 1500) return 35;
+  return 20;
+}
+function scoreKitchen(h) { return h.kitchenRating || 50; }
+function scoreEntertaining(h) { return h.entertainingRating || 50; }
+function scoreAge(h) {
+  const y = h.yearBuilt;
+  if (!y) return 50;
+  let base;
+  if (y >= 2015) base = 95;
+  else if (y >= 2000) base = 88;
+  else if (y >= 1990) base = 78;
+  else if (y >= 1980) base = 68;
+  else if (y >= 1970) base = 55;
+  else if (y >= 1960) base = 45;
+  else if (y >= 1940) base = 35;
+  else base = 15;
+  // Renovation bump
+  const reno = h.renoRating || 0;
+  return Math.min(100, Math.round(base * 0.6 + reno * 0.4));
+}
+function scoreHeating(h) {
+  let s = 50;
+  if (h.heatingType === 'gas') s = 95;
+  else if (h.heatingType === 'electric') s = 70;
+  else if (h.heatingType === 'heatpump') s = 80;
+  else if (h.heatingType === 'oil') s = 40;
+  if (h.centralAir) s = Math.round(s * 0.8 + 100 * 0.2);
+  else s = Math.round(s * 0.8 + 20 * 0.2);
+  return s;
+}
+function scoreStreet(h) { return h.streetRating || 50; }
+function scoreGarage(h) {
+  const g = h.garageSpaces || 0;
+  if (g >= 2 && h.garageAttached) return 95;
+  if (g >= 2) return 88;
+  if (g >= 1 && h.garageAttached) return 78;
+  if (g >= 1) return 70;
+  return 20;
+}
+
+const SCORE_FNS = { price:scorePrice, size:scoreSize, kitchen:scoreKitchen, entertaining:scoreEntertaining, age:scoreAge, heating:scoreHeating, street:scoreStreet, garage:scoreGarage };
+
+function calcHouseScore(h) {
+  const tw = HOUSE_CATS.reduce((s,c) => s + c.weight, 0);
+  return Math.round(HOUSE_CATS.reduce((s,c) => s + SCORE_FNS[c.id](h) * (c.weight / tw), 0) * 10) / 10;
+}
+function getCatScore(h, catId) { return Math.round(SCORE_FNS[catId](h)); }
+
+function getTier(s) { return s>=78?'S':s>=72?'A':s>=66?'B':s>=60?'C':s>=54?'D':s>=48?'E':'F'; }
+function getTierColor(t) { return {S:'#ff6b9d',A:'#c084fc',B:'#6c7bff',C:'#38bdf8',D:'#34d399',E:'#fbbf24',F:'#f87171'}[t]||'#888'; }
+function getScoreColor(s) { return getTierColor(getTier(s)); }
+
+function checkMustHaves(h) {
+  return MUST_HAVES.map(m => ({ ...m, passed: m.check(h) }));
+}
+
+// ===== PERSISTENCE =====
+function save() {
+  try { localStorage.setItem('houseScorer', JSON.stringify(listings)); } catch(e) {}
+}
+
+// ===== RENDER SIDEBAR =====
+function renderSidebar() {
+  document.getElementById('listing-count').textContent = listings.length;
+  const el = document.getElementById('listing-list');
+  if (!listings.length) {
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-dim);font-size:13px;">No listings yet. Click "+ Add Listing" to start.</div>';
+    return;
+  }
+  let html = '';
+  // Sort by house score descending
+  const sorted = [...listings].sort((a,b) => calcHouseScore(b) - calcHouseScore(a));
+  for (const h of sorted) {
+    const hs = calcHouseScore(h);
+    const hTier = getTier(hs);
+    const hColor = getTierColor(hTier);
+    const ts = TOWN_SCORES[h.townId];
+    const tComp = ts ? ts.composite : null;
+    const tTier = ts ? ts.tier : '?';
+    const tColor = ts ? getTierColor(tTier) : '#888';
+    const musts = checkMustHaves(h);
+    const failCount = musts.filter(m => !m.passed).length;
+
+    html += `<div class="listing-card ${activeId===h.id?'active':''}" onclick="viewDetail('${h.id}')">
+      <div class="address">${h.address || 'Untitled Listing'}</div>
+      <div class="meta">
+        <span>${h.bedrooms||'?'}bd / ${h.bathsFull||'?'}ba</span>
+        <span>${h.sqft ? h.sqft.toLocaleString()+'sf' : '?sf'}</span>
+        <span>${h.price ? '$'+h.price.toLocaleString() : '?'}</span>
+      </div>
+      <div class="scores-row">
+        <div class="score-pill" style="background:${hColor}22;color:${hColor};">
+          <span class="label">House</span>${hTier} ${hs.toFixed(1)}
+        </div>
+        ${tComp !== null ? `<div class="score-pill" style="background:${tColor}22;color:${tColor};">
+          <span class="label">Town</span>${tTier} ${tComp.toFixed(1)}
+        </div>` : ''}
+        ${failCount > 0 ? `<div class="flag flag-fail">${failCount} must-have${failCount>1?'s':''} failed</div>` : ''}
+      </div>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+// ===== ADD/EDIT FORM =====
+function showAddForm(existingId) {
+  mode = 'form';
+  editingId = existingId || null;
+  const h = existingId ? listings.find(l => l.id === existingId) : null;
+  activeId = null;
+  renderSidebar();
+
+  const townOpts = Object.entries(TOWN_SCORES)
+    .sort((a,b) => b[1].composite - a[1].composite)
+    .map(([id, t]) => `<option value="${id}" ${h && h.townId===id ? 'selected' : ''}>${t.name} (${t.tier} · ${t.composite})</option>`)
+    .join('');
+
+  document.getElementById('content').innerHTML = `
+    <h2 style="font-size:20px;margin-bottom:20px;">${h ? 'Edit' : 'Add'} Listing</h2>
+
+    <div class="form-section">
+      <h3>Listing Info</h3>
+      <div class="form-row">
+        <div class="form-field" style="flex:2;"><label>Address</label><input id="f-address" value="${esc(h?.address)}" placeholder="123 Main St, Milton, MA"></div>
+        <div class="form-field"><label>Listing URL</label><input id="f-url" value="${esc(h?.url)}" placeholder="https://zillow.com/..."></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Town</label><select id="f-town"><option value="">— Select town —</option>${townOpts}</select></div>
+        <div class="form-field"><label>Price ($)</label><input type="number" id="f-price" value="${h?.price||''}" placeholder="950000"></div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3>Property Basics</h3>
+      <div class="form-row">
+        <div class="form-field"><label>Bedrooms</label><select id="f-beds">${[1,2,3,4,5,6].map(n=>`<option value="${n}" ${h?.bedrooms===n?'selected':''}>${n}</option>`).join('')}</select></div>
+        <div class="form-field"><label>Offices / Dens</label><select id="f-offices">${[0,1,2,3].map(n=>`<option value="${n}" ${h?.offices===n?'selected':''}>${n}</option>`).join('')}</select></div>
+        <div class="form-field"><label>Full Baths</label><select id="f-bathsfull">${[1,2,3,4,5].map(n=>`<option value="${n}" ${h?.bathsFull===n?'selected':''}>${n}</option>`).join('')}</select></div>
+        <div class="form-field"><label>Half Baths</label><select id="f-bathshalf">${[0,1,2,3].map(n=>`<option value="${n}" ${h?.bathsHalf===n?'selected':''}>${n}</option>`).join('')}</select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Sq Ft</label><input type="number" id="f-sqft" value="${h?.sqft||''}" placeholder="2500"></div>
+        <div class="form-field"><label>Year Built</label><input type="number" id="f-year" value="${h?.yearBuilt||''}" placeholder="1985"></div>
+        <div class="form-field"><label>Lot Size (acres)</label><input type="number" step="0.01" id="f-lot" value="${h?.lotSize||''}" placeholder="0.25"></div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3>Systems</h3>
+      <div class="form-row">
+        <div class="form-field"><label>Heating</label>
+          <select id="f-heating">
+            <option value="gas" ${h?.heatingType==='gas'?'selected':''}>Gas (forced air / boiler)</option>
+            <option value="heatpump" ${h?.heatingType==='heatpump'?'selected':''}>Heat Pump</option>
+            <option value="electric" ${h?.heatingType==='electric'?'selected':''}>Electric</option>
+            <option value="oil" ${h?.heatingType==='oil'?'selected':''}>Oil</option>
+            <option value="other" ${h?.heatingType==='other'?'selected':''}>Other / Unknown</option>
+          </select>
+        </div>
+        <div class="form-field" style="justify-content:flex-end;">
+          <div class="toggle-row"><input type="checkbox" class="toggle" id="f-ac" ${h?.centralAir?'checked':''}><label for="f-ac">Central Air</label></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3>Garage</h3>
+      <div class="form-row">
+        <div class="form-field"><label>Garage Spaces</label><select id="f-garage">${[0,1,2,3].map(n=>`<option value="${n}" ${h?.garageSpaces===n?'selected':''}>${n}</option>`).join('')}</select></div>
+        <div class="form-field" style="justify-content:flex-end;">
+          <div class="toggle-row"><input type="checkbox" class="toggle" id="f-attached" ${h?.garageAttached?'checked':''}><label for="f-attached">Attached garage</label></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3>Your Ratings (slide to rate after viewing photos/touring)</h3>
+      <div class="rating-group" style="margin-bottom:16px;">
+        <label>Kitchen Quality — modern appliances, layout, counter space, finishes</label>
+        <div class="rating-row"><input type="range" min="0" max="100" value="${h?.kitchenRating||50}" id="f-kitchen" oninput="document.getElementById('v-kitchen').textContent=this.value"><div class="val" id="v-kitchen">${h?.kitchenRating||50}</div></div>
+      </div>
+      <div class="rating-group" style="margin-bottom:16px;">
+        <label>Entertaining Space — open concept, great room, deck/patio, hosting flow</label>
+        <div class="rating-row"><input type="range" min="0" max="100" value="${h?.entertainingRating||50}" id="f-entertaining" oninput="document.getElementById('v-entertaining').textContent=this.value"><div class="val" id="v-entertaining">${h?.entertainingRating||50}</div></div>
+      </div>
+      <div class="rating-group" style="margin-bottom:16px;">
+        <label>Renovation Quality — gut reno vs cosmetic flip vs original (applies to older homes)</label>
+        <div class="rating-row"><input type="range" min="0" max="100" value="${h?.renoRating||50}" id="f-reno" oninput="document.getElementById('v-reno').textContent=this.value"><div class="val" id="v-reno">${h?.renoRating||50}</div></div>
+      </div>
+      <div class="rating-group" style="margin-bottom:16px;">
+        <label>Street & Setting — quiet street, neighborhood feel, not on a main road</label>
+        <div class="rating-row"><input type="range" min="0" max="100" value="${h?.streetRating||50}" id="f-street" oninput="document.getElementById('v-street').textContent=this.value"><div class="val" id="v-street">${h?.streetRating||50}</div></div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3>Notes</h3>
+      <div class="form-field"><textarea id="f-notes" rows="3" placeholder="Anything else — basement, yard, vibe, red flags...">${esc(h?.notes)}</textarea></div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:20px;">
+      <button class="btn btn-primary" onclick="saveListing()" style="padding:10px 28px;font-size:14px;">${h ? 'Save Changes' : 'Score This Listing'}</button>
+      <button class="btn" onclick="cancelForm()">Cancel</button>
+    </div>
+  `;
+}
+
+function esc(v) { return (v||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function saveListing() {
+  const h = editingId ? listings.find(l => l.id === editingId) : { id: 'h-' + Date.now() };
+  h.address = document.getElementById('f-address').value.trim();
+  h.url = document.getElementById('f-url').value.trim();
+  h.townId = document.getElementById('f-town').value;
+  h.price = parseInt(document.getElementById('f-price').value) || 0;
+  h.bedrooms = parseInt(document.getElementById('f-beds').value) || 0;
+  h.offices = parseInt(document.getElementById('f-offices').value) || 0;
+  h.bathsFull = parseInt(document.getElementById('f-bathsfull').value) || 0;
+  h.bathsHalf = parseInt(document.getElementById('f-bathshalf').value) || 0;
+  h.sqft = parseInt(document.getElementById('f-sqft').value) || 0;
+  h.yearBuilt = parseInt(document.getElementById('f-year').value) || 0;
+  h.lotSize = parseFloat(document.getElementById('f-lot').value) || 0;
+  h.heatingType = document.getElementById('f-heating').value;
+  h.centralAir = document.getElementById('f-ac').checked;
+  h.garageSpaces = parseInt(document.getElementById('f-garage').value) || 0;
+  h.garageAttached = document.getElementById('f-attached').checked;
+  h.kitchenRating = parseInt(document.getElementById('f-kitchen').value);
+  h.entertainingRating = parseInt(document.getElementById('f-entertaining').value);
+  h.renoRating = parseInt(document.getElementById('f-reno').value);
+  h.streetRating = parseInt(document.getElementById('f-street').value);
+  h.notes = document.getElementById('f-notes').value.trim();
+
+  if (!editingId) listings.push(h);
+  save();
+  viewDetail(h.id);
+}
+
+function cancelForm() {
+  if (activeId) viewDetail(activeId);
+  else showEmpty();
+}
+
+// ===== DETAIL VIEW =====
+function viewDetail(id) {
+  const h = listings.find(l => l.id === id);
+  if (!h) return;
+  activeId = id;
+  mode = 'detail';
+  renderSidebar();
+
+  const hs = calcHouseScore(h);
+  const hTier = getTier(hs);
+  const hColor = getTierColor(hTier);
+  const ts = TOWN_SCORES[h.townId];
+  const tComp = ts ? ts.composite : null;
+  const tTier = ts ? ts.tier : null;
+  const tColor = ts ? getTierColor(tTier) : '#888';
+  const musts = checkMustHaves(h);
+
+  let html = `<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+    <div>
+      <h2 style="font-size:22px;font-weight:700;">${h.address || 'Untitled Listing'}</h2>
+      <div style="font-size:13px;color:var(--text-dim);margin-top:4px;">
+        ${h.bedrooms||'?'} bed · ${h.offices ? h.offices+' office · ':''}${h.bathsFull||'?'} bath${h.bathsHalf?' · '+h.bathsHalf+' half':''} · ${h.sqft?h.sqft.toLocaleString()+'sf':'?sf'} · ${h.yearBuilt||'?'} · ${h.price?'$'+h.price.toLocaleString():'?'}
+      </div>
+      ${h.url ? `<a href="${h.url}" target="_blank" class="url-link" style="margin-top:4px;display:inline-block;">View listing ↗</a>` : ''}
+      ${h.openHouseStart ? `<div style="margin-top:6px;padding:6px 12px;background:rgba(192,132,252,.12);border:1px solid rgba(192,132,252,.3);border-radius:6px;font-size:13px;color:var(--purple);display:inline-block;">Open House: ${h.openHouseStart}${h.openHouseEnd ? ' — '+h.openHouseEnd : ''}</div>` : ''}
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn" onclick="showAddForm('${h.id}')">Edit</button>
+      <button class="btn btn-danger" onclick="deleteListing('${h.id}')">Delete</button>
+    </div>
+  </div>`;
+
+  // Big score cards
+  html += `<div class="detail-scores">
+    <div class="score-big-card">
+      <div class="label">House Score</div>
+      <div class="value" style="color:${hColor};">${hs.toFixed(1)}</div>
+      <div class="tier" style="color:${hColor};">${hTier} Tier</div>
+    </div>
+    <div class="score-big-card">
+      <div class="label">Town Score${ts ? ' — '+ts.name : ''}</div>
+      <div class="value" style="color:${tColor};">${tComp !== null ? tComp.toFixed(1) : '—'}</div>
+      <div class="tier" style="color:${tColor};">${tTier ? tTier+' Tier' : 'No town selected'}</div>
+    </div>
+  </div>`;
+
+  // Must-haves
+  html += `<div class="must-have-section"><h3 style="font-size:14px;font-weight:600;margin-bottom:10px;">Must-Haves</h3>`;
+  for (const m of musts) {
+    const icon = m.passed ? '✓' : '✗';
+    const color = m.passed ? 'var(--green)' : 'var(--red)';
+    html += `<div class="must-have-row"><span class="must-have-icon" style="color:${color};">${icon}</span><span>${m.label}</span></div>`;
+  }
+  html += `</div>`;
+
+  // Category breakdown
+  html += `<h3 style="font-size:14px;font-weight:600;margin-bottom:10px;">Score Breakdown</h3>`;
+  html += `<div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Click any category to see scoring details ▼</div>`;
+
+  for (const cat of HOUSE_CATS) {
+    const cs = getCatScore(h, cat.id);
+    const cc = getScoreColor(cs);
+    const detail = getScoreDetail(h, cat.id);
+    html += `<div class="breakdown-card" onclick="this.classList.toggle('open')">
+      <div class="breakdown-header">
+        <div class="left"><span class="cat-name">${cat.label}</span><span class="cat-weight">${cat.weight}%</span></div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="score" style="color:${cc};">${cs}</span>
+          <span style="font-size:12px;color:var(--text-dim);">▼</span>
+        </div>
+      </div>
+      <div class="breakdown-body">${detail}</div>
+    </div>`;
+  }
+
+  // Composite formula
+  html += `<div style="margin-top:16px;font-size:12px;color:var(--text-dim);background:var(--surface);border-left:3px solid var(--accent);border-radius:6px;padding:10px 14px;font-family:'SF Mono',Monaco,Consolas,monospace;line-height:1.6;">
+    House Score = ${HOUSE_CATS.map(c => getCatScore(h,c.id)+'×'+c.weight+'%').join(' + ')} = <strong style="color:${hColor};">${hs.toFixed(1)}</strong> → <strong style="color:${hColor};">${hTier} Tier</strong>
+  </div>`;
+
+  // Notes
+  if (h.notes) {
+    html += `<div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);"><h3 style="font-size:14px;font-weight:600;margin-bottom:8px;">Notes</h3><div style="font-size:13px;color:var(--text-dim);line-height:1.6;white-space:pre-wrap;">${esc(h.notes)}</div></div>`;
+  }
+
+  document.getElementById('content').innerHTML = html;
+}
+
+function getScoreDetail(h, catId) {
+  switch(catId) {
+    case 'price': {
+      const p = h.price;
+      return `<div>Price: <strong>$${p?p.toLocaleString():'?'}</strong></div>
+        <div style="margin-top:6px;">Budget: $700K–$1.4M range · $900K–$1.1M sweet spot</div>
+        <div style="margin-top:4px;font-family:monospace;font-size:12px;background:var(--bg);padding:6px 10px;border-radius:4px;">
+          $900K–$1.1M → 95 · $1.1M–$1.25M → 85 · $800K–$900K → 78<br>$700K–$800K → 68 · $1.25M–$1.4M → 65 · >$1.4M → 30 · <$700K → 55
+        </div>`;
+    }
+    case 'size':
+      return `<div>Square footage: <strong>${h.sqft?h.sqft.toLocaleString():'?'}</strong> (target: 2,500+)</div>
+        <div style="margin-top:4px;font-family:monospace;font-size:12px;background:var(--bg);padding:6px 10px;border-radius:4px;">
+          ≥2800sf → 95 · ≥2500sf → 88 · ≥2200sf → 75 · ≥2000sf → 65<br>≥1800sf → 50 · ≥1500sf → 35 · <1500sf → 20
+        </div>`;
+    case 'kitchen':
+      return `<div>Your kitchen rating: <strong>${h.kitchenRating||50}/100</strong></div>
+        <div style="margin-top:4px;color:var(--text-dim);">Rate based on: modern appliances, counter space, layout, finishes, island, storage</div>`;
+    case 'entertaining':
+      return `<div>Your entertaining rating: <strong>${h.entertainingRating||50}/100</strong></div>
+        <div style="margin-top:4px;color:var(--text-dim);">Rate based on: open floor plan, great room, deck/patio, flow between kitchen and living, hosting capacity</div>`;
+    case 'age': {
+      const y = h.yearBuilt;
+      return `<div>Year built: <strong>${y||'?'}</strong> · Renovation rating: <strong>${h.renoRating||50}/100</strong></div>
+        <div style="margin-top:4px;">Score = 60% age base + 40% renovation quality</div>
+        <div style="margin-top:4px;font-family:monospace;font-size:12px;background:var(--bg);padding:6px 10px;border-radius:4px;">
+          Age base: 2015+ → 95 · 2000+ → 88 · 1990+ → 78 · 1980+ → 68<br>1970+ → 55 · 1960+ → 45 · 1940+ → 35 · pre-1940 → 15
+        </div>`;
+    }
+    case 'heating':
+      return `<div>Heating: <strong>${h.heatingType||'?'}</strong> · Central air: <strong>${h.centralAir?'Yes':'No'}</strong></div>
+        <div style="margin-top:4px;">Score = 80% heating type + 20% AC</div>
+        <div style="margin-top:4px;font-family:monospace;font-size:12px;background:var(--bg);padding:6px 10px;border-radius:4px;">
+          Gas → 95 · Heat pump → 80 · Electric → 70 · Oil → 40<br>Central air → +20% bonus · No AC → penalty
+        </div>`;
+    case 'street':
+      return `<div>Your street/setting rating: <strong>${h.streetRating||50}/100</strong></div>
+        <div style="margin-top:4px;color:var(--text-dim);">Rate based on: quiet street, cul-de-sac, neighborhood feel, not on main road, safe for kids</div>`;
+    case 'garage': {
+      const g = h.garageSpaces||0;
+      return `<div>Garage spaces: <strong>${g}</strong> · Attached: <strong>${h.garageAttached?'Yes':'No'}</strong></div>
+        <div style="margin-top:4px;font-family:monospace;font-size:12px;background:var(--bg);padding:6px 10px;border-radius:4px;">
+          2+ attached → 95 · 2+ detached → 88 · 1 attached → 78<br>1 detached → 70 · No garage → 20
+        </div>`;
+    }
+    default: return '';
+  }
+}
+
+function deleteListing(id) {
+  if (!confirm('Delete this listing?')) return;
+  listings = listings.filter(l => l.id !== id);
+  save();
+  activeId = null;
+  showEmpty();
+}
+
+function showEmpty() {
+  mode = 'empty';
+  activeId = null;
+  renderSidebar();
+  document.getElementById('content').innerHTML = `
+    <div class="empty-state">
+      <h2>House Scorer</h2>
+      <p>Add a listing to get started. Enter the property details, rate the subjective stuff (kitchen, entertaining space, street feel), and get an instant score alongside the town score from your Town Ranker.</p>
+      <button class="btn btn-primary" style="margin-top:20px;padding:10px 24px;" onclick="showAddForm()">+ Add Your First Listing</button>
+    </div>`;
+}
+
+function clearAllListings() {
+  if (!listings.length) { alert('No listings to clear.'); return; }
+  if (!confirm(`Delete all ${listings.length} listing(s)? This cannot be undone.`)) return;
+  listings = [];
+  activeId = null;
+  save();
+  if (compareVisible) renderCompareTable();
+  else showEmpty();
+}
+
+function exportListings() {
+  const data = listings.map(h => ({
+    address: h.address, town: TOWN_SCORES[h.townId]?.name || h.townId, url: h.url,
+    houseScore: calcHouseScore(h), houseTier: getTier(calcHouseScore(h)),
+    townScore: TOWN_SCORES[h.townId]?.composite || null, townTier: TOWN_SCORES[h.townId]?.tier || null,
+    mustHaves: Object.fromEntries(checkMustHaves(h).map(m=>[m.label, m.passed])),
+    categories: Object.fromEntries(HOUSE_CATS.map(c=>[c.label, getCatScore(h, c.id)])),
+    details: { price:h.price, beds:h.bedrooms, offices:h.offices, bathsFull:h.bathsFull, bathsHalf:h.bathsHalf, sqft:h.sqft, yearBuilt:h.yearBuilt, heating:h.heatingType, centralAir:h.centralAir, garage:h.garageSpaces, garageAttached:h.garageAttached },
+    notes: h.notes
+  }));
+  const b = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const u = URL.createObjectURL(b);
+  const a = document.createElement('a');
+  a.href=u; a.download='house-scores.json'; a.click();
+  URL.revokeObjectURL(u);
+}
+
+// ===== IMPORT FROM REDFIN FETCHER =====
+function matchTownId(townName) {
+  if (!townName) return '';
+  const lower = townName.toLowerCase().trim();
+  // Direct match on town name
+  for (const [id, t] of Object.entries(TOWN_SCORES)) {
+    if (t.name.toLowerCase() === lower) return id;
+  }
+  // Partial match
+  for (const [id, t] of Object.entries(TOWN_SCORES)) {
+    if (lower.includes(t.name.toLowerCase()) || t.name.toLowerCase().includes(lower)) return id;
+  }
+  return '';
+}
+
+async function pasteFromClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    let data;
+    try { data = JSON.parse(text); } catch(e) {
+      alert('Clipboard does not contain valid JSON. Use the bookmarklet on a Redfin/Zillow listing first.');
+      return;
+    }
+    // Wrap single object in array
+    if (!Array.isArray(data)) data = [data];
+    // Feed through same import logic
+    let imported = 0, skipped = 0;
+    for (const item of data) {
+      const addr = item.address || item.shortAddress || '';
+      if (addr && listings.some(l => l.address === addr)) { skipped++; continue; }
+      const listing = {
+        id: item.id || 'h-' + Date.now() + '-' + Math.random().toString(36).slice(2,6),
+        address: addr,
+        url: item.url || '',
+        townId: matchTownId(item.town || ''),
+        price: item.price || 0,
+        bedrooms: item.bedrooms || item.beds || 0,
+        offices: item.offices || 0,
+        bathsFull: item.bathsFull || item.baths || 0,
+        bathsHalf: item.bathsHalf || 0,
+        sqft: item.sqft || 0,
+        yearBuilt: item.yearBuilt || 0,
+        lotSize: item.lotAcres || 0,
+        heatingType: item.heatingType || '',
+        centralAir: item.centralAir != null ? item.centralAir : false,
+        garageSpaces: item.garageSpaces || 0,
+        garageAttached: item.garageAttached || false,
+        kitchenRating: item.kitchenRating || 50,
+        entertainingRating: item.entertainingRating || 50,
+        renoRating: item.renoRating || 50,
+        streetRating: item.streetRating || 50,
+        openHouseStart: item.openHouseStart || item.openHouseInfo || '',
+        openHouseEnd: item.openHouseEnd || '',
+        notes: item.notes || [item.daysOnMarket ? `${item.daysOnMarket} days on market.` : '', item.openHouseInfo || ''].filter(Boolean).join(' | '),
+      };
+      listings.push(listing);
+      imported++;
+    }
+    save();
+    renderSidebar();
+    if (imported > 0) {
+      viewDetail(listings[listings.length - 1].id);
+      alert(`Pasted ${imported} listing${imported!==1?'s':''}.${skipped ? ' Skipped '+skipped+' duplicate(s).' : ''}`);
+    } else if (skipped > 0) {
+      alert(`Listing already exists (${skipped} duplicate${skipped!==1?'s':''}).`);
+    }
+  } catch(e) {
+    // Clipboard API blocked — fall back to prompt
+    const text = prompt('Paste the JSON from the bookmarklet:');
+    if (text) {
+      // Recursion-safe: write to clipboard then retry
+      try {
+        const data = JSON.parse(text);
+        await navigator.clipboard.writeText(text);
+        pasteFromClipboard();
+      } catch(e2) { alert('Invalid JSON: ' + e2.message); }
+    }
+  }
+}
+
+function importListings(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error('Expected JSON array');
+      let imported = 0, skipped = 0;
+      for (const item of data) {
+        // Skip duplicates by address
+        const addr = item.address || item.shortAddress || '';
+        if (addr && listings.some(l => l.address === addr)) { skipped++; continue; }
+
+        // Map redfin_fetcher output to our listing format
+        const listing = {
+          id: item.id || 'h-' + Date.now() + '-' + Math.random().toString(36).slice(2,6),
+          address: addr,
+          url: item.url || '',
+          townId: matchTownId(item.town || ''),
+          price: item.price || 0,
+          bedrooms: item.bedrooms || item.beds || 0,
+          offices: item.offices || 0,
+          bathsFull: item.bathsFull || item.baths || 0,
+          bathsHalf: item.bathsHalf || 0,
+          sqft: item.sqft || 0,
+          yearBuilt: item.yearBuilt || 0,
+          lotSize: item.lotAcres || 0,
+          heatingType: item.heatingType || item.heating || '',
+          centralAir: item.centralAir != null ? item.centralAir : false,
+          garageSpaces: item.garageSpaces || item.garage || 0,
+          garageAttached: item.garageAttached || false,
+          kitchenRating: item.kitchenRating || 50,
+          entertainingRating: item.entertainingRating || 50,
+          renoRating: item.renoRating || 50,
+          streetRating: item.streetRating || 50,
+          openHouseStart: item.openHouseStart || '',
+          openHouseEnd: item.openHouseEnd || '',
+          notes: item.notes || [item.daysOnMarket ? `${item.daysOnMarket} days on market.` : '', item.propertyType || '', item.hoa ? `HOA: ${item.hoa}` : '', item.openHouseStart ? `Open house: ${item.openHouseStart}${item.openHouseEnd ? ' — '+item.openHouseEnd : ''}` : ''].filter(Boolean).join(' | '),
+        };
+        listings.push(listing);
+        imported++;
+      }
+      save();
+      renderSidebar();
+      alert(`Imported ${imported} listing${imported!==1?'s':''}.${skipped ? ' Skipped '+skipped+' duplicate(s).' : ''}`);
+      if (imported > 0) viewDetail(listings[listings.length - imported].id);
+    } catch(err) {
+      alert('Import error: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';  // reset so same file can be re-imported
+}
+
+// ===== COMPARISON TABLE =====
+let compareVisible = false;
+let sortCol = 'houseScore';
+let sortDir = -1; // -1 = descending
+
+function toggleCompare() {
+  compareVisible = !compareVisible;
+  document.getElementById('btn-compare').textContent = compareVisible ? 'Card View' : 'Compare Table';
+  document.querySelector('.main').classList.toggle('hidden', compareVisible);
+  document.getElementById('compare-view').classList.toggle('active', compareVisible);
+  if (compareVisible) renderCompareTable();
+}
+
+function sortCompare(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = -1; }
+  renderCompareTable();
+}
+
+function renderCompareTable() {
+  if (!listings.length) {
+    document.getElementById('compare-view').innerHTML = '<div style="text-align:center;padding:60px;color:var(--text-dim);">No listings to compare.</div>';
+    return;
+  }
+
+  // Build data rows
+  const rows = listings.map(h => {
+    const hs = calcHouseScore(h);
+    const ts = TOWN_SCORES[h.townId];
+    const musts = checkMustHaves(h);
+    return {
+      h, id: h.id,
+      address: h.address || 'Untitled',
+      town: ts ? ts.name : '—',
+      price: h.price || 0,
+      beds: h.bedrooms || 0,
+      baths: (h.bathsFull||0) + (h.bathsHalf||0)*0.5,
+      sqft: h.sqft || 0,
+      year: h.yearBuilt || 0,
+      heating: h.heatingType || '—',
+      ac: h.centralAir ? 'Yes' : 'No',
+      garage: h.garageSpaces || 0,
+      garageAtt: h.garageAttached ? 'Att' : (h.garageSpaces ? 'Det' : '—'),
+      houseScore: hs,
+      houseTier: getTier(hs),
+      townScore: ts ? ts.composite : 0,
+      townTier: ts ? ts.tier : '—',
+      catPrice: getCatScore(h, 'price'),
+      catSize: getCatScore(h, 'size'),
+      catKitchen: getCatScore(h, 'kitchen'),
+      catEntertaining: getCatScore(h, 'entertaining'),
+      catAge: getCatScore(h, 'age'),
+      catHeating: getCatScore(h, 'heating'),
+      catStreet: getCatScore(h, 'street'),
+      catGarage: getCatScore(h, 'garage'),
+      mustFails: musts.filter(m => !m.passed).length,
+      mustDetails: musts,
+    };
+  });
+
+  // Sort
+  rows.sort((a, b) => {
+    let av = a[sortCol], bv = b[sortCol];
+    if (typeof av === 'string') return sortDir * av.localeCompare(bv);
+    return sortDir * ((av||0) - (bv||0));
+  });
+
+  const arrow = (col) => {
+    if (sortCol !== col) return '<span class="sort-arrow">⇅</span>';
+    return `<span class="sort-arrow">${sortDir < 0 ? '▼' : '▲'}</span>`;
+  };
+  const thCls = (col) => sortCol === col ? 'sorted' : '';
+
+  let html = '<table class="compare-table"><thead><tr>';
+  const cols = [
+    ['address','Address'],['town','Town'],['price','Price'],
+    ['beds','Beds'],['baths','Baths'],['sqft','Sqft'],['year','Year'],
+    ['heating','Heat'],['ac','AC'],['garage','Gar'],['garageAtt','Type'],
+    ['houseScore','House'],['houseTier','HTier'],
+    ['townScore','Town Sc'],['townTier','TTier'],
+    ['catPrice','Price%'],['catSize','Size%'],['catKitchen','Kitch%'],
+    ['catEntertaining','Ent%'],['catAge','Age%'],['catHeating','Heat%'],
+    ['catStreet','Street%'],['catGarage','Gar%'],
+    ['mustFails','Fails'],
+  ];
+  for (const [key, label] of cols) {
+    html += `<th class="${thCls(key)}" onclick="sortCompare('${key}')">${label}${arrow(key)}</th>`;
+  }
+  // Must-have individual columns
+  for (const m of MUST_HAVES) {
+    const short = m.label.split('(')[0].trim().substring(0, 10);
+    html += `<th class="${thCls('mh_'+m.id)}" title="${m.label}">${short}</th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const r of rows) {
+    const hc = getTierColor(r.houseTier);
+    const tc = getTierColor(r.townTier);
+
+    html += '<tr>';
+    html += `<td><a href="#" onclick="event.preventDefault();exitCompareToDetail('${r.id}')" style="color:var(--text);text-decoration:none;" title="${r.address}">${r.address.length > 30 ? r.address.slice(0,28)+'…' : r.address}</a></td>`;
+    html += `<td>${r.town}</td>`;
+    html += `<td>$${r.price ? r.price.toLocaleString() : '—'}</td>`;
+    html += `<td>${r.beds || '—'}</td>`;
+    html += `<td>${r.baths || '—'}</td>`;
+    html += `<td>${r.sqft ? r.sqft.toLocaleString() : '—'}</td>`;
+    html += `<td>${r.year || '—'}</td>`;
+    html += `<td>${r.heating}</td>`;
+    html += `<td class="${r.ac==='Yes'?'must-pass':'must-fail'}">${r.ac}</td>`;
+    html += `<td>${r.garage || '—'}</td>`;
+    html += `<td>${r.garageAtt}</td>`;
+    html += `<td class="score-cell" style="color:${hc};"><span class="tier-badge" style="background:${hc}22;color:${hc};">${r.houseScore.toFixed(1)}</span></td>`;
+    html += `<td><span class="tier-badge" style="background:${hc}22;color:${hc};">${r.houseTier}</span></td>`;
+    html += `<td class="score-cell" style="color:${tc};">${r.townScore ? r.townScore.toFixed(1) : '—'}</td>`;
+    html += `<td><span class="tier-badge" style="background:${tc}22;color:${tc};">${r.townTier}</span></td>`;
+
+    // Category scores with color coding
+    for (const catKey of ['catPrice','catSize','catKitchen','catEntertaining','catAge','catHeating','catStreet','catGarage']) {
+      const v = r[catKey];
+      const cc = getScoreColor(v);
+      html += `<td class="score-cell" style="color:${cc};">${v}</td>`;
+    }
+
+    // Must-have fails count
+    html += `<td class="${r.mustFails > 0 ? 'must-fail' : 'must-pass'}">${r.mustFails === 0 ? '✓' : r.mustFails}</td>`;
+
+    // Individual must-haves
+    for (const m of r.mustDetails) {
+      html += `<td class="${m.passed ? 'must-pass' : 'must-fail'}">${m.passed ? '✓' : '✗'}</td>`;
+    }
+
+    html += '</tr>';
+  }
+
+  html += '</tbody></table>';
+  document.getElementById('compare-view').innerHTML = html;
+}
+
+function exitCompareToDetail(id) {
+  compareVisible = false;
+  document.getElementById('btn-compare').textContent = 'Compare Table';
+  document.querySelector('.main').classList.remove('hidden');
+  document.getElementById('compare-view').classList.remove('active');
+  viewDetail(id);
+}
+
+// Init
+document.addEventListener('keydown', e => { if(e.key==='Escape' && mode==='form') cancelForm(); });
+showEmpty();
+</script>
+</body>
+</html>

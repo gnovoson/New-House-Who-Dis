@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home Town Ranker</title>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #232736; --border: #2e3345;
+    --text: #e4e6f0; --text-dim: #8b8fa3; --accent: #6c7bff; --accent-glow: rgba(108,123,255,0.15);
+    --tier-s: #ff6b9d; --tier-a: #c084fc; --tier-b: #6c7bff; --tier-c: #38bdf8;
+    --tier-d: #34d399; --tier-e: #fbbf24; --tier-f: #f87171;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+  .app-header { padding:24px 32px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .app-header h1 { font-size:22px; font-weight:700; letter-spacing:-0.5px; }
+  .app-header h1 span { color:var(--accent); }
+  .header-actions { display:flex; gap:10px; }
+  .btn { padding:8px 16px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer; transition:all .2s; }
+  .btn:hover { background:var(--surface2); border-color:var(--accent); }
+  .btn-primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn-primary:hover { background:#5a6ae8; }
+  .main { display:flex; height:calc(100vh - 73px); }
+  .sidebar { width:280px; border-right:1px solid var(--border); padding:20px; overflow-y:auto; flex-shrink:0; }
+  .sidebar h3 { font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--text-dim); margin-bottom:12px; }
+  .filter-group { margin-bottom:20px; }
+  .filter-group label { display:flex; align-items:center; gap:8px; padding:6px 0; font-size:13px; cursor:pointer; }
+  .filter-group input[type="checkbox"] { accent-color:var(--accent); }
+  .weight-slider { margin-bottom:14px; }
+  .weight-slider label { display:flex; justify-content:space-between; font-size:12px; color:var(--text-dim); margin-bottom:4px; }
+  .weight-slider label span { color:var(--accent); font-weight:600; }
+  .weight-slider input[type="range"] { width:100%; accent-color:var(--accent); }
+  .content { flex:1; overflow-y:auto; padding:24px; }
+  .view-toggle { display:flex; gap:4px; background:var(--surface); border-radius:8px; padding:3px; margin-bottom:20px; }
+  .view-toggle button { padding:6px 14px; border:none; background:transparent; color:var(--text-dim); border-radius:6px; font-size:13px; cursor:pointer; }
+  .view-toggle button.active { background:var(--accent); color:#fff; }
+  .tier-section { margin-bottom:16px; }
+  .tier-label { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; border-radius:10px; font-size:20px; font-weight:800; margin-right:12px; vertical-align:middle; }
+  .tier-header { display:flex; align-items:center; margin-bottom:10px; }
+  .tier-header span { font-size:13px; color:var(--text-dim); }
+  .tier-row { display:flex; gap:10px; flex-wrap:wrap; margin-left:56px; margin-bottom:8px; }
+  .town-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 18px; cursor:pointer; transition:all .2s; min-width:180px; flex:0 0 auto; }
+  .town-card:hover { border-color:var(--accent); transform:translateY(-2px); box-shadow:0 4px 20px rgba(0,0,0,.3); }
+  .town-card .name { font-size:15px; font-weight:600; margin-bottom:4px; }
+  .town-card .score { font-size:12px; color:var(--text-dim); }
+  .town-card .mini-bars { display:flex; gap:2px; margin-top:8px; }
+  .town-card .mini-bar { flex:1; height:4px; border-radius:2px; background:var(--surface2); overflow:hidden; }
+  .town-card .mini-bar .fill { height:100%; border-radius:2px; }
+  .table-container { overflow-x:auto; }
+  table { width:100%; border-collapse:separate; border-spacing:0; font-size:13px; }
+  thead th { position:sticky; top:0; background:var(--surface); padding:10px 12px; text-align:left; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-dim); border-bottom:1px solid var(--border); cursor:pointer; white-space:nowrap; user-select:none; }
+  thead th:hover { color:var(--accent); }
+  thead th.sorted { color:var(--accent); }
+  tbody tr { cursor:pointer; transition:background .15s; }
+  tbody tr:hover { background:var(--accent-glow); }
+  tbody td { padding:10px 12px; border-bottom:1px solid var(--border); }
+  .tier-badge { display:inline-flex; align-items:center; justify-content:center; width:30px; height:24px; border-radius:6px; font-size:12px; font-weight:700; }
+  .cat-score-bar { display:flex; align-items:center; gap:6px; }
+  .cat-score-bar .bar { width:50px; height:6px; border-radius:3px; background:var(--surface2); overflow:hidden; }
+  .cat-score-bar .bar .fill { height:100%; border-radius:3px; }
+  .cat-score-bar .val { font-size:11px; color:var(--text-dim); min-width:24px; }
+  .detail-overlay { position:fixed; top:0; right:0; bottom:0; width:580px; background:var(--surface); border-left:1px solid var(--border); z-index:100; transform:translateX(100%); transition:transform .3s ease; overflow-y:auto; box-shadow:-10px 0 40px rgba(0,0,0,.4); }
+  .detail-overlay.open { transform:translateX(0); }
+  .detail-header { padding:24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-start; }
+  .detail-header h2 { font-size:24px; font-weight:700; }
+  .detail-close { background:none; border:none; color:var(--text-dim); font-size:24px; cursor:pointer; padding:4px 8px; }
+  .detail-close:hover { color:var(--text); }
+  .detail-body { padding:24px; }
+  .detail-tier-big { font-size:48px; font-weight:800; margin-bottom:4px; }
+  .detail-score-big { font-size:14px; color:var(--text-dim); margin-bottom:24px; }
+  .rubric-card { background:var(--bg); border:1px solid var(--border); border-radius:10px; margin-bottom:14px; overflow:hidden; }
+  .rubric-card-header { display:flex; justify-content:space-between; align-items:center; padding:14px 16px; cursor:pointer; transition:background .15s; }
+  .rubric-card-header:hover { background:var(--surface2); }
+  .rubric-card-header .left { display:flex; align-items:center; gap:10px; }
+  .rubric-card-header .cat-name { font-size:14px; font-weight:600; }
+  .rubric-card-header .cat-weight { font-size:11px; color:var(--text-dim); background:var(--surface2); padding:2px 8px; border-radius:4px; }
+  .rubric-card-header .right { display:flex; align-items:center; gap:10px; }
+  .rubric-card-header .cat-score { font-size:16px; font-weight:700; }
+  .rubric-card-header .expand-arrow { font-size:12px; color:var(--text-dim); transition:transform .2s; }
+  .rubric-card.open .expand-arrow { transform:rotate(180deg); }
+  .rubric-card-body { display:none; padding:0 16px 16px; }
+  .rubric-card.open .rubric-card-body { display:block; }
+  .sub-metric { margin-bottom:12px; }
+  .sub-metric-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+  .sub-metric-name { font-size:12px; color:var(--text-dim); }
+  .sub-metric-val { font-size:12px; font-weight:600; }
+  .sub-metric-bar { width:100%; height:6px; border-radius:3px; background:var(--surface); overflow:hidden; }
+  .sub-metric-bar .fill { height:100%; border-radius:3px; }
+  .sub-metric-detail { font-size:11px; color:var(--text-dim); margin-top:3px; line-height:1.4; }
+  .sub-metric-detail .raw { color:var(--accent); }
+  .rubric-formula { font-size:11px; color:var(--text-dim); background:var(--surface); border-radius:6px; padding:8px 10px; margin-top:8px; font-family:'SF Mono',Monaco,Consolas,monospace; line-height:1.5; border-left:3px solid var(--accent); }
+  .est-badge { display:inline-block; font-size:9px; background:#fbbf2433; color:#fbbf24; padding:1px 5px; border-radius:3px; margin-left:4px; font-weight:600; vertical-align:middle; }
+  .detail-section { margin-top:24px; padding-top:20px; border-top:1px solid var(--border); }
+  .detail-section h4 { font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--text-dim); margin-bottom:12px; }
+  .detail-stat { display:flex; justify-content:space-between; padding:6px 0; font-size:13px; }
+  .detail-stat .label { color:var(--text-dim); }
+  .detail-notes { font-size:13px; color:var(--text-dim); line-height:1.6; margin-top:8px; }
+  .commute-card { background:var(--bg); border-radius:10px; padding:14px; margin-bottom:10px; }
+  .commute-card .dest { font-size:13px; font-weight:600; margin-bottom:6px; }
+  .commute-card .route { font-size:12px; color:var(--text-dim); line-height:1.5; }
+  .commute-card .time { font-size:18px; font-weight:700; color:var(--accent); margin-top:6px; }
+  .override-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .override-row label { font-size:12px; color:var(--text-dim); min-width:80px; }
+  .override-row input[type="range"] { flex:1; accent-color:var(--accent); }
+  .override-row .val { font-size:12px; color:var(--accent); font-weight:600; min-width:20px; text-align:right; }
+  .override-btn { font-size:11px; padding:4px 10px; border-radius:4px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer; }
+  .override-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .tier-s{background:rgba(255,107,157,.15);color:var(--tier-s)}.tier-a{background:rgba(192,132,252,.15);color:var(--tier-a)}.tier-b{background:rgba(108,123,255,.15);color:var(--tier-b)}.tier-c{background:rgba(56,189,248,.15);color:var(--tier-c)}.tier-d{background:rgba(52,211,153,.15);color:var(--tier-d)}.tier-e{background:rgba(251,191,36,.15);color:var(--tier-e)}.tier-f{background:rgba(248,113,113,.15);color:var(--tier-f)}
+  @media(max-width:900px){.sidebar{display:none}.detail-overlay{width:100%}}
+</style>
+</head>
+<body>
+<div class="app-header">
+  <h1><span>Town</span>Ranker</h1>
+  <div class="header-actions">
+    <button class="btn" onclick="exportData()">Export JSON</button>
+    <button class="btn btn-primary" onclick="showAddTown()">+ Add Town</button>
+  </div>
+</div>
+<div class="main">
+  <div class="sidebar">
+    <div class="filter-group">
+      <h3>Filter by Tier</h3>
+      <label><input type="checkbox" checked data-tier="S" onchange="applyFilters()"> S Tier</label>
+      <label><input type="checkbox" checked data-tier="A" onchange="applyFilters()"> A Tier</label>
+      <label><input type="checkbox" checked data-tier="B" onchange="applyFilters()"> B Tier</label>
+      <label><input type="checkbox" checked data-tier="C" onchange="applyFilters()"> C Tier</label>
+      <label><input type="checkbox" checked data-tier="D" onchange="applyFilters()"> D Tier</label>
+      <label><input type="checkbox" checked data-tier="E" onchange="applyFilters()"> E Tier</label>
+      <label><input type="checkbox" checked data-tier="F" onchange="applyFilters()"> F Tier</label>
+    </div>
+    <div class="filter-group">
+      <h3>Adjust Weights</h3>
+      <div class="weight-slider"><label>Schools <span id="w-schools-val">27%</span></label><input type="range" min="0" max="50" value="27" id="w-schools" oninput="updateWeights()"></div>
+      <div class="weight-slider"><label>Commute <span id="w-commute-val">27%</span></label><input type="range" min="0" max="50" value="27" id="w-commute" oninput="updateWeights()"></div>
+      <div class="weight-slider"><label>Home Value <span id="w-housing-val">12%</span></label><input type="range" min="0" max="50" value="12" id="w-housing" oninput="updateWeights()"></div>
+      <div class="weight-slider"><label>Political <span id="w-political-val">8%</span></label><input type="range" min="0" max="50" value="8" id="w-political" oninput="updateWeights()"></div>
+      <div class="weight-slider"><label>Walkability <span id="w-walkability-val">8%</span></label><input type="range" min="0" max="50" value="8" id="w-walkability" oninput="updateWeights()"></div>
+      <div class="weight-slider"><label>Food & Dining <span id="w-dining-val">8%</span></label><input type="range" min="0" max="50" value="8" id="w-dining" oninput="updateWeights()"></div>
+      <div class="weight-slider"><label>Community <span id="w-community-val">5%</span></label><input type="range" min="0" max="50" value="5" id="w-community" oninput="updateWeights()"></div>
+      <div class="weight-slider"><label>Safety <span id="w-safety-val">5%</span></label><input type="range" min="0" max="50" value="5" id="w-safety" oninput="updateWeights()"></div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:8px;">Total: <span id="weight-total" style="color:var(--accent);font-weight:600;">100%</span></div>
+    </div>
+  </div>
+  <div class="content" id="content">
+    <div class="view-toggle">
+      <button class="active" onclick="setView('tier')">Tier List</button>
+      <button onclick="setView('table')">Table</button>
+    </div>
+    <div id="view-container"></div>
+  </div>
+</div>
+<div class="detail-overlay" id="detail-panel">
+  <div class="detail-header">
+    <div><h2 id="detail-name"></h2><div style="font-size:13px;color:var(--text-dim);" id="detail-county"></div></div>
+    <button class="detail-close" onclick="closeDetail()">&times;</button>
+  </div>
+  <div class="detail-body" id="detail-body"></div>
+</div>
+
+<script>
+const CATEGORIES = ['schools','commute','housing','political','safety','walkability','dining','community'];
+const CAT_LABELS = {schools:'Schools',commute:'Commute',housing:'Home Value',political:'Political Align.',safety:'Safety',walkability:'Walkability',dining:'Food & Dining',community:'Community'};
+const TIER_ORDER = ['S','A','B','C','D','E','F'];
+let weights = {schools:27,commute:27,housing:12,political:8,safety:5,walkability:8,dining:8,community:5};
+let currentView='tier', sortCol='composite', sortDir=-1;
+let visibleTiers = new Set(TIER_ORDER);
+
+/*
+POLITICAL ALIGNMENT RUBRIC:
+- Uses 2024 presidential Dem vote share % as primary metric
+- Score formula: (demPct - 30) × 2, capped at 100
+  50% Dem = 40, 55% = 50, 60% = 60, 65% = 70, 70% = 80, 75% = 90
+- Data marked as ESTIMATE where exact town results couldn't be sourced
+  (county-level confirmed: Norfolk 61.2%, Plymouth ~55%, Bristol ~50%)
+- Override any value you disagree with
+*/
+
+
+let towns = [
+  {
+    id:'newton', name:'Newton', county:'Middlesex', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'9 / 10',formula:'9 × 10 = 90',score:90},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~75% avg ELA+Math',formula:'75',score:75,estimated:true},{name:'High School Rank',weight:0.25,raw:'Newton South #24, North #35 in MA',formula:'100 - 20 = 80',score:80,estimated:true}] },
+      commute: { submetrics: [{name:'Fan Pier (MBTA)',weight:0.5,raw:'Est 38 min',formula:'100 - (38 - 30) × 2 = 84',score:84,estimated:true},{name:'Mass Ave drive',weight:0.5,raw:'Est 18 min',formula:'100 - (18 - 20) × 2.5 = 105 → 100 cap',score:100,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$1,663,300 median',formula:'Above $1.2M = 40',score:40},{name:'Tax Rate',weight:0.3,raw:'Est ~11.5 / 1000',formula:'≈$11.5 = 70',score:70,estimated:true},{name:'Trend',weight:0.2,raw:'7.2% (2023)',formula:'3-7% = 85',score:85}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'77% Harris',formula:'(77 - 30) × 2 = 94',score:94}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'6.1 per 1,000',formula:'<7 = 95',score:95},{name:'Crime Trend',weight:0.3,raw:'Improving',formula:'Improving = 90',score:90,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'50',formula:'Direct = 50',score:50},{name:'Town Center',weight:0.5,raw:'Newton Centre and Newton Highlands',formula:'Strong village centers = 80',score:80,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~60 restaurants',formula:'50+ = 85',score:85,estimated:true},{name:'Quality',weight:0.6,raw:'Diverse upscale, casual, ethnic',formula:'Diverse = 85',score:85,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Active farmers market, events',formula:'Active = 85',score:85,estimated:true},{name:'Character',weight:0.6,raw:'Strong identity, distinct villages',formula:'Strong = 85',score:85,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive or MBTA bus to downtown',time:'35-40 min'},
+      massAve:{mode:'Drive via Mass Pike or local roads',time:'15-20 min'},
+      stations:['Newton Centre Green Line'], line:'Green Line'
+    }}
+  },
+  {
+    id:'arlington', name:'Arlington', county:'Middlesex', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'9 / 10',formula:'9 × 10 = 90',score:90},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~71% avg (81.71% ELA)',formula:'71',score:71,estimated:true},{name:'High School Rank',weight:0.25,raw:'Arlington High #10 in MA',formula:'100 - 10 = 90',score:90}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 38 min',formula:'100 - (38 - 30) × 2 = 84',score:84,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 18 min',formula:'100 - (18 - 20) × 2.5 = 105 → 100',score:100,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Est ~$1.0M median',formula:'$900K-$1.05M sweet spot = 95',score:95,estimated:true},{name:'Tax Rate',weight:0.3,raw:'Est ~$12.3 / 1000',formula:'$13+ = 50',score:50,estimated:true},{name:'Trend',weight:0.2,raw:'Est ~3% annual',formula:'3-7% = 85',score:85,estimated:true}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~74% Harris (Boston area, strong blue)',formula:'(74 - 30) × 2 = 88',score:88,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 7.5 per 1,000',formula:'<7 = 95 → 8 = 85',score:85,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Stable/improving',formula:'Improving = 90',score:90,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'64',formula:'Direct = 64',score:64},{name:'Town Center',weight:0.5,raw:'Arlington Center, East Arlington',formula:'Some centers = 60',score:60,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~40 restaurants',formula:'30+ = 70',score:70,estimated:true},{name:'Quality',weight:0.6,raw:'Good diverse mix',formula:'Good = 70',score:70,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Some community events',formula:'Some = 65',score:65,estimated:true},{name:'Character',weight:0.6,raw:'Established close-in suburb',formula:'Established = 65',score:65,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to Green Line or commuter rail',time:'35-40 min'},
+      massAve:{mode:'Drive via Route 2 or Mass Pike',time:'16-20 min'},
+      stations:['Arlington Center Red Line'], line:'Red Line'
+    }}
+  },
+  {
+    id:'belmont', name:'Belmont', county:'Middlesex', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'9 / 10',formula:'9 × 10 = 90',score:90},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~73% avg',formula:'73',score:73,estimated:true},{name:'High School Rank',weight:0.25,raw:'Belmont High #9 in MA',formula:'100 - 9 = 91',score:91}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 40 min',formula:'100 - (40 - 30) × 2 = 80',score:80,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 20 min',formula:'100 - (20 - 20) × 2.5 = 100',score:100,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$1.5M median (Jan 2026)',formula:'Above $1.2M = 40',score:40},{name:'Tax Rate',weight:0.3,raw:'$11.51 / 1000 (FY2026)',formula:'$10-12 range = 75',score:75},{name:'Trend',weight:0.2,raw:'6.3% (Jan 2026 YoY)',formula:'3-7% = 85',score:85}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~79% Harris (10,568-2,828 votes)',formula:'(79 - 30) × 2 = 98',score:98}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'9 per 1,000 (2023)',formula:'8-9 = 85',score:85},{name:'Crime Trend',weight:0.3,raw:'Stable/improving',formula:'Improving = 90',score:90,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'60',formula:'Direct = 60',score:60},{name:'Town Center',weight:0.5,raw:'Belmont Center, Waverley Square',formula:'Some centers = 60',score:60,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~35 restaurants',formula:'30+ = 70',score:70,estimated:true},{name:'Quality',weight:0.6,raw:'Good upscale and casual mix',formula:'Good = 70',score:70,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Some community events',formula:'Some = 65',score:65,estimated:true},{name:'Character',weight:0.6,raw:'Established affluent suburb',formula:'Established = 65',score:65,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to commuter rail or express bus',time:'38-42 min'},
+      massAve:{mode:'Drive via Mass Pike or Route 2',time:'18-22 min'},
+      stations:['Belmont Center'], line:'Red Line proximity'
+    }}
+  },
+  {
+    id:'milton', name:'Milton', county:'Norfolk County', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'8 / 10',formula:'rating x 10',score:80},{name:'MCAS Proficiency',weight:0.35,raw:'ELA 84% + Math 75% -> avg 79.5%',formula:'direct %',score:80},{name:'HS Ranking Percentile',weight:0.25,raw:'Top 10% in MA (34th of 348)',formula:'100 - percentile',score:90}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Milton Stn -> South Stn -> Silver Line ~ 45 min',formula:'100-(min-30)x2',score:70},{name:'Mass Ave (drive)',weight:0.5,raw:'I-93/Rte 28 ~ 30 min',formula:'100-(min-20)x2.5',score:75}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Median $987,500 - in sweet spot',formula:'sweet spot = 95',score:95},{name:'Tax Rate',weight:0.3,raw:'~$11.40/1000',formula:'$11=62',score:62},{name:'Price Trend',weight:0.2,raw:'+6.8% YoY',formula:'3-7%=83',score:83}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~69% Harris',formula:'(69-30)x2=78',score:78,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'7.0 per 1,000',formula:'<7=93',score:93},{name:'Trend',weight:0.3,raw:'Down 7% vs 2023',formula:'improving=90',score:90}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'62',formula:'direct',score:62},{name:'Town Center Quality',weight:0.5,raw:'Milton Centre: historic, walkable',formula:'real downtown=75',score:75}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'50+',formula:'50+=85',score:85},{name:'Scene Quality',weight:0.6,raw:'Madre Osteria, Novara, Steel & Rye',formula:'diverse=85',score:85}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Farmers Market, Music in the Park',formula:'active=82',score:82},{name:'Character & Charm',weight:0.6,raw:'Affluent, well-educated, excellent schools',formula:'strong=82',score:82}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Car -> Milton Station (Franklin Line) -> South Station -> Silver Line',time:'40-50 min'},
+      massAve:{mode:'Drive via I-93 / Rte 28',time:'25-35 min'},
+      stations:['Milton Station','East Milton','Central/Neponset'], line:'Franklin Line'
+    }}
+  },
+  {
+    id:'dedham', name:'Dedham', county:'Middlesex/Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'7 / 10',formula:'7 × 10 = 70',score:70,estimated:true},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~70% avg',formula:'70',score:70,estimated:true},{name:'High School Rank',weight:0.25,raw:'Est ~50th percentile',formula:'100 - 50 = 50',score:50,estimated:true}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 35 min',formula:'100 - (35 - 30) × 2 = 90',score:90,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 15 min',formula:'100 - (15 - 20) × 2.5 = 112 → 100',score:100,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Est ~$850K median',formula:'Below $900K = 80',score:80,estimated:true},{name:'Tax Rate',weight:0.3,raw:'Est ~$12.5 / 1000',formula:'$13+ = 50',score:50,estimated:true},{name:'Trend',weight:0.2,raw:'Est ~3% annual',formula:'3-7% = 85',score:85,estimated:true}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~72% Harris (closer to Boston, blue)',formula:'(72 - 30) × 2 = 84',score:84,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 8 per 1,000',formula:'8 = 85',score:85,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Est stable',formula:'Stable = 70',score:70,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Est ~55',formula:'Direct = 55',score:55,estimated:true},{name:'Town Center',weight:0.5,raw:'Dedham Square downtown',formula:'Some center = 60',score:60,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~40 restaurants',formula:'30+ = 70',score:70,estimated:true},{name:'Quality',weight:0.6,raw:'Good mix, some upscale',formula:'Good = 70',score:70,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Some events, local activities',formula:'Some = 65',score:65,estimated:true},{name:'Character',weight:0.6,raw:'Established suburb, historic core',formula:'Established = 65',score:65,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to Orange Line or commuter rail',time:'32-38 min'},
+      massAve:{mode:'Drive via Route 1 or local roads',time:'12-18 min'},
+      stations:['Dedham Square area'], line:'Orange Line nearby'
+    }}
+  },
+  {
+    id:'needham', name:'Needham', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'8 / 10',formula:'8 × 10 = 80',score:80,estimated:true},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~74% avg',formula:'74',score:74,estimated:true},{name:'High School Rank',weight:0.25,raw:'Est ~15th percentile (top schools)',formula:'100 - 15 = 85',score:85,estimated:true}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 48 min',formula:'100 - (48 - 30) × 2 = 64',score:64,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 28 min',formula:'100 - (28 - 20) × 2.5 = 80',score:80,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$1.357-1.550M median',formula:'Above $1.2M = 40',score:40},{name:'Tax Rate',weight:0.3,raw:'Est ~$12.8 / 1000',formula:'$13+ = 50',score:50,estimated:true},{name:'Trend',weight:0.2,raw:'12.93% (2024)',formula:'>10% = 65',score:65}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~75% Harris (affluent suburbs trend blue)',formula:'(75 - 30) × 2 = 90',score:90,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 6 per 1,000',formula:'<7 = 95',score:95,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Stable/improving',formula:'Improving = 90',score:90,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'39 overall, 92 downtown',formula:'Downtown focus = 70',score:70,estimated:true},{name:'Town Center',weight:0.5,raw:'Needham downtown/Great Plain Ave',formula:'Real downtown = 80',score:80}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~50 restaurants',formula:'50+ = 85',score:85,estimated:true},{name:'Quality',weight:0.6,raw:'Upscale and casual mix',formula:'Good = 70',score:70,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Farmers market, community events',formula:'Some = 65',score:65,estimated:true},{name:'Character',weight:0.6,raw:'Established affluent suburb',formula:'Established = 65',score:65,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to commuter rail or shuttle',time:'45-50 min'},
+      massAve:{mode:'Drive via Route 128/Route 95',time:'25-30 min'},
+      stations:['Needham Commuter Rail (Providence Line)'], line:'Providence Commuter Rail Line'
+    }}
+  },
+  {
+    id:'wellesley', name:'Wellesley', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'8 / 10',formula:'8 × 10 = 80',score:80,estimated:true},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~75% avg',formula:'75',score:75,estimated:true},{name:'High School Rank',weight:0.25,raw:'Est ~20th percentile (strong)',formula:'100 - 20 = 80',score:80,estimated:true}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 50 min',formula:'100 - (50 - 30) × 2 = 60',score:60,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 30 min',formula:'100 - (30 - 20) × 2.5 = 75',score:75,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$1.169-1.51M median',formula:'Above $1.2M = 40',score:40},{name:'Tax Rate',weight:0.3,raw:'Est ~$13.2 / 1000',formula:'$13+ = 50',score:50,estimated:true},{name:'Trend',weight:0.2,raw:'Est ~4-5% annual',formula:'3-7% = 85',score:85,estimated:true}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'~73% Harris',formula:'(73 - 30) × 2 = 86',score:86}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 6.2 per 1,000 (very safe)',formula:'<7 = 95',score:95,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Improving',formula:'Improving = 90',score:90,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'91 downtown',formula:'Direct = 91',score:91},{name:'Town Center',weight:0.5,raw:'Real downtown, Wellesley Square',formula:'Real downtown = 80',score:80}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~45 restaurants',formula:'30+ = 70',score:70,estimated:true},{name:'Quality',weight:0.6,raw:'Upscale and diverse',formula:'Good/diverse = 70',score:70,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Farmers market, community events',formula:'Some = 65',score:65,estimated:true},{name:'Character',weight:0.6,raw:'Strong affluent character, heritage',formula:'Strong identity = 85',score:85,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to commuter rail station',time:'48-52 min'},
+      massAve:{mode:'Drive via Route 16/Route 9',time:'28-32 min'},
+      stations:['Wellesley Square'], line:'Commuter Rail (Framingham Line)'
+    }}
+  },
+  {
+    id:'hingham', name:'Hingham', county:'Plymouth County', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'8 / 10',formula:'rating x 10',score:80},{name:'MCAS Proficiency',weight:0.35,raw:'Strong ~ est 72%',formula:'direct %',score:72},{name:'HS Ranking Percentile',weight:0.25,raw:'Top 15%',formula:'100-15=85',score:85}] },
+      commute: { submetrics: [{name:'Fan Pier (rail/ferry)',weight:0.5,raw:'Ferry 37 min',formula:'100-(37-30)x2=86',score:86},{name:'Mass Ave (drive)',weight:0.5,raw:'Rte 3/I-93 ~ 40 min',formula:'100-(40-20)x2.5=50',score:50}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Median est $1M',formula:'in sweet spot=90',score:90},{name:'Tax Rate',weight:0.3,raw:'Est ~$13/1000',formula:'$13=50',score:50},{name:'Price Trend',weight:0.2,raw:'5-7% YoY',formula:'3-7%=85',score:85}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~58% Harris',formula:'(58-30)x2=56',score:56,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'20.8 per 1,000',formula:'20+=40',score:40},{name:'Trend',weight:0.3,raw:'Stable',formula:'stable=70',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'65',formula:'direct',score:65},{name:'Town Center Quality',weight:0.5,raw:'Hingham Harbor: genuine walkable downtown',formula:'real downtown=82',score:82}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'30+',formula:'30+=70',score:70},{name:'Scene Quality',weight:0.6,raw:'Tosca, seafood, waterfront',formula:'good=72',score:72}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Farmers Market 3rd oldest in MA',formula:'very active=88',score:88},{name:'Character & Charm',weight:0.6,raw:'Charming waterfront, maritime heritage',formula:'strong=88',score:88}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'West Hingham (Greenbush) or Ferry -> Rowes Wharf',time:'35-55 min'},
+      massAve:{mode:'Drive via Rte 3 / I-93',time:'35-45 min'},
+      stations:['West Hingham'], line:'Greenbush Line'
+      ,bonus:'Ferry to Rowes Wharf (30 min, $3-10)'
+    }}
+  },
+  {
+    id:'watertown', name:'Watertown', county:'Middlesex', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est ~6.5 / 10',formula:'6.5 × 10 = 65',score:65,estimated:true},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~68% avg ELA+Math',formula:'68',score:68,estimated:true},{name:'High School Rank',weight:0.25,raw:'Est ~55th percentile',formula:'100 - 55 = 45',score:45,estimated:true}] },
+      commute: { submetrics: [{name:'Fan Pier (MBTA commuter rail to subway)',weight:0.5,raw:'Est 42 min',formula:'100 - (42 - 30) × 2 = 76',score:76,estimated:true},{name:'Mass Ave, South End (peak drive)',weight:0.5,raw:'Est 22 min',formula:'100 - (22 - 20) × 2.5 = 95',score:95,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit (median $721K)',weight:0.5,raw:'$721,300',formula:'Below $900K but not sweet spot = 75',score:75},{name:'Tax Rate',weight:0.3,raw:'$11.70 / 1000 assessed',formula:'$11.70 falls near $10 tier = 75',score:75},{name:'Trend',weight:0.2,raw:'Est ~2% annual',formula:'Stable/modest = 65',score:65,estimated:true}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~70% Harris (suburban Boston, blue lean)',formula:'(70 - 30) × 2 = 80',score:80,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'20 per 1,000',formula:'20+ per 1K = 40',score:40},{name:'Crime Trend',weight:0.3,raw:'Est stable',formula:'Stable = 70',score:70,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'76',formula:'Direct score = 76',score:76},{name:'Town Center',weight:0.5,raw:'Downtown Watertown exists with retail/dining',formula:'Some center = 60',score:60,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~35 restaurants',formula:'30+ = 70',score:70,estimated:true},{name:'Quality',weight:0.6,raw:'Diverse casual, some upscale',formula:'Good mix = 70',score:70,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Some farmers market, local events',formula:'Some = 65',score:65,estimated:true},{name:'Character',weight:0.6,raw:'Established close-in suburb, industrial heritage',formula:'Established = 65',score:65,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to commuter rail or bus',time:'38-45 min'},
+      massAve:{mode:'Drive via Mass Pike/Route 2',time:'20-25 min'},
+      stations:['Watertown Square'], line:'Red/Green Line proximity'
+    }}
+  },
+  {
+    id:'westwood', name:'Westwood', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'8 / 10',formula:'8 × 10 = 80',score:80,estimated:true},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~73% avg',formula:'73',score:73,estimated:true},{name:'High School Rank',weight:0.25,raw:'Westwood High in top 20 MA',formula:'100 - 18 = 82',score:82,estimated:true}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 52 min',formula:'100 - (52 - 30) × 2 = 56',score:56,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 32 min',formula:'100 - (32 - 20) × 2.5 = 70',score:70,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$1.1-1.21M median',formula:'$900K-$1.05M sweet spot ≈ 85',score:85,estimated:true},{name:'Tax Rate',weight:0.3,raw:'Est ~$11.2 / 1000',formula:'$10-12 = 75',score:75,estimated:true},{name:'Trend',weight:0.2,raw:'11.3% (May 2024)',formula:'>10% = 65',score:65}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'~63.7% Harris',formula:'(63.7 - 30) × 2 = 67.4',score:67}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 6 per 1,000',formula:'<7 = 95',score:95,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Improving',formula:'Improving = 90',score:90,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Est ~45',formula:'Direct = 45',score:45,estimated:true},{name:'Town Center',weight:0.5,raw:'Limited downtown',formula:'Some center = 60',score:60,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~35 restaurants',formula:'30+ = 70',score:70,estimated:true},{name:'Quality',weight:0.6,raw:'Good mix, some upscale',formula:'Good = 70',score:70,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Some local events',formula:'Some = 65',score:65,estimated:true},{name:'Character',weight:0.6,raw:'Established affluent suburb',formula:'Established = 65',score:65,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to commuter rail or express bus',time:'48-55 min'},
+      massAve:{mode:'Drive via Route 128/Route 1',time:'28-35 min'},
+      stations:['Westwood Station area'], line:'Various routes'
+    }}
+  },
+  {
+    id:'natick', name:'Natick', county:'Middlesex', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'7 / 10',formula:'7 × 10 = 70',score:70,estimated:true},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~71% avg',formula:'71',score:71,estimated:true},{name:'High School Rank',weight:0.25,raw:'Natick High highly rated',formula:'Est ~40th percentile = 60',score:60,estimated:true}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 50 min',formula:'100 - (50 - 30) × 2 = 60',score:60,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 32 min',formula:'100 - (32 - 20) × 2.5 = 70',score:70,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$933K median',formula:'$900K-$1.05M sweet spot ≈ 90',score:90},{name:'Tax Rate',weight:0.3,raw:'Est ~$11.5 / 1000',formula:'$10-12 = 75',score:75,estimated:true},{name:'Trend',weight:0.2,raw:'6.6% (2025)',formula:'3-7% = 85',score:85}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~68% Harris (moderate suburb)',formula:'(68 - 30) × 2 = 76',score:76,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 7 per 1,000',formula:'<7 = 95 → 8 = 85',score:85,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Stable',formula:'Stable = 70',score:70,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Est ~48',formula:'Direct = 48',score:48,estimated:true},{name:'Town Center',weight:0.5,raw:'Natick Center downtown',formula:'Some center = 60',score:60,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'104 restaurants (Tripadvisor)',formula:'50+ = 85',score:85},{name:'Quality',weight:0.6,raw:'Diverse casual and upscale',formula:'Good/diverse = 70',score:70,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Some farmers market, events',formula:'Some = 65',score:65,estimated:true},{name:'Character',weight:0.6,raw:'Established suburban community',formula:'Established = 65',score:65,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to commuter rail or express bus',time:'48-52 min'},
+      massAve:{mode:'Drive via Route 9/Route 27',time:'30-35 min'},
+      stations:['Natick Center'], line:'MBTA bus/rail'
+    }}
+  },
+  {
+    id:'duxbury', name:'Duxbury', county:'Plymouth', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 8.7/10',formula:'rating x 10',score:87},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:87},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:87}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:47},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:47}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:61},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:61},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:61}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~62% Harris',formula:'(62-30)x2=64',score:64,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:90},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:71},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:71}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:75},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:75}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:86},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:86}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~56 min'},
+      massAve:{mode:'Drive to South End',time:'~41 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'franklin', name:'Franklin', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 8.2/10',formula:'rating x 10',score:82},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:82},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:82}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:50},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:50}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:86},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:86},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:86}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~60% Harris',formula:'(60-30)x2=60',score:60,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:87},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:51},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:51}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:71},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:71}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:80},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:80}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~55 min'},
+      massAve:{mode:'Drive to South End',time:'~40 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'scituate', name:'Scituate', county:'Plymouth', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 7.8/10',formula:'rating x 10',score:78},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:78},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:78}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:54},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:54}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:67},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:67},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:67}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~63% Harris',formula:'(63-30)x2=66',score:66,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:88},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:66},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:66}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:74},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:74}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:80},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:80}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~53 min'},
+      massAve:{mode:'Drive to South End',time:'~38 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'quincy', name:'Quincy', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 4.8/10',formula:'rating x 10',score:48},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:48},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:48}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:76},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:76}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:76},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:76},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:76}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~62% Harris',formula:'(62-30)x2=64',score:64,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:57},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:74},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:74}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:90},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:90}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:79},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:79}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~42 min'},
+      massAve:{mode:'Drive to South End',time:'~30 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'canton', name:'Canton', county:'Norfolk County', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'7 / 10',formula:'rating x 10',score:70},{name:'MCAS Proficiency',weight:0.35,raw:'ELA 61% + Math 60%',formula:'direct %',score:61},{name:'HS Ranking Percentile',weight:0.25,raw:'Est Top 35%',formula:'100-35=65',score:65}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Canton Jct ~ 50 min',formula:'100-(50-30)x2=60',score:60},{name:'Mass Ave (drive)',weight:0.5,raw:'I-93 ~ 35 min',formula:'100-(35-20)x2.5=62',score:62}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Median est $750K',formula:'below $800K=72',score:72},{name:'Tax Rate',weight:0.3,raw:'$9.97/1000',formula:'$10=70',score:70},{name:'Price Trend',weight:0.2,raw:'+3-5%',formula:'3-7%=85',score:85}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~60% Harris',formula:'(60-30)x2=60',score:60,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'8.0 per 1,000',formula:'8=85',score:85},{name:'Trend',weight:0.3,raw:'Stable',formula:'stable=70',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'71',formula:'direct',score:71},{name:'Town Center Quality',weight:0.5,raw:'Canton Center walkable near station',formula:'decent=68',score:68}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'50+',formula:'50+=85',score:85},{name:'Scene Quality',weight:0.6,raw:'Trillium, Northern Spy, diverse',formula:'diverse=80',score:80}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Farmers Market, Heritage Festival',formula:'active=78',score:78},{name:'Character & Charm',weight:0.6,raw:'Historic suburb, village character',formula:'good=72',score:72}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Car -> Canton Junction -> South Station -> Silver Line',time:'45-55 min'},
+      massAve:{mode:'Drive via I-93 / Rte 138',time:'30-40 min'},
+      stations:['Canton Center','Canton Junction'], line:'Providence/Stoughton Line'
+    }}
+  },
+  {
+    id:'hanover', name:'Hanover', county:'Plymouth', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 7.1/10',formula:'rating x 10',score:71},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:71},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:71}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:67},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:67}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:70},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:70},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:70}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~57% Harris',formula:'(57-30)x2=54',score:54,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:78},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:57},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:57}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:71},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:71}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:67},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:67}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~46 min'},
+      massAve:{mode:'Drive to South End',time:'~33 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'waltham', name:'Waltham', county:'Middlesex', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'5 / 10',formula:'5 × 10 = 50',score:50},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~55% avg',formula:'55',score:55,estimated:true},{name:'High School Rank',weight:0.25,raw:'Est ~70th percentile',formula:'100 - 70 = 30',score:30,estimated:true}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 40 min',formula:'100 - (40 - 30) × 2 = 80',score:80,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 22 min',formula:'100 - (22 - 20) × 2.5 = 95',score:95,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$688K median',formula:'Below $700K = 65',score:65},{name:'Tax Rate',weight:0.3,raw:'Est ~$10.5 / 1000',formula:'$10 = 70',score:70,estimated:true},{name:'Trend',weight:0.2,raw:'-15.1% (down from last year)',formula:'Declining = 60',score:60}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'~66% Harris',formula:'(66 - 30) × 2 = 72',score:72}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 12 per 1,000',formula:'10-15 = 75 → 15 = 55',score:65,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Est stable',formula:'Stable = 70',score:70,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Est ~62',formula:'Direct = 62',score:62,estimated:true},{name:'Town Center',weight:0.5,raw:'Waltham downtown exists',formula:'Some center = 60',score:60,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~45 restaurants',formula:'30+ = 70',score:70,estimated:true},{name:'Quality',weight:0.6,raw:'Good mix, diverse casual',formula:'Good = 70',score:70,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Some community events',formula:'Some = 65',score:65,estimated:true},{name:'Character',weight:0.6,raw:'Industrial/commercial heritage, diverse',formula:'Some character = 65',score:65,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to Red Line or commuter rail',time:'38-42 min'},
+      massAve:{mode:'Drive via Main/Route 20',time:'20-25 min'},
+      stations:['Waltham Station'], line:'Red Line'
+    }}
+  },
+  {
+    id:'braintree', name:'Braintree', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 6.5/10',formula:'rating x 10',score:65},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:65},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:65}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:72},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:72}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:75},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:75},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:75}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~57% Harris',formula:'(57-30)x2=54',score:54,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:62},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:54},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:54}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:72},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:72}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:62},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:62}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~44 min'},
+      massAve:{mode:'Drive to South End',time:'~31 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'walpole', name:'Walpole', county:'Norfolk County', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'7 / 10',formula:'rating x 10',score:70},{name:'MCAS Proficiency',weight:0.35,raw:'~55%',formula:'direct %',score:55},{name:'HS Ranking Percentile',weight:0.25,raw:'Niche #20, Top 8%',formula:'100-8=92',score:92}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Walpole Stn ~ 45 min',formula:'100-(45-30)x2=70',score:70},{name:'Mass Ave (drive)',weight:0.5,raw:'I-95/Rte 1 ~ 30 min',formula:'100-(30-20)x2.5=75',score:75}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Median $694K',formula:'below $700K=65',score:65},{name:'Tax Rate',weight:0.3,raw:'Est $12/1000',formula:'$12=55',score:55},{name:'Price Trend',weight:0.2,raw:'+3.5%',formula:'3-7%=85',score:85}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~55% Harris',formula:'(55-30)x2=50',score:50,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'~10 per 1,000',formula:'10=75',score:75},{name:'Trend',weight:0.3,raw:'Stable',formula:'stable=70',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'55',formula:'direct',score:55},{name:'Town Center Quality',weight:0.5,raw:'Center near rail',formula:'some=58',score:58}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'25+',formula:'25=60',score:60},{name:'Scene Quality',weight:0.6,raw:'Beacons, mix',formula:'decent=58',score:58}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Family-oriented',formula:'some=60',score:60},{name:'Character & Charm',weight:0.6,raw:'Established suburb',formula:'established=62',score:62}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Car -> Walpole Station -> South Station -> Silver Line',time:'40-50 min'},
+      massAve:{mode:'Drive via I-95 / Rte 1',time:'25-35 min'},
+      stations:['Walpole Station'], line:'Franklin/Foxboro Line'
+    }}
+  },
+  {
+    id:'medfield', name:'Medfield', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'7 / 10',formula:'7 × 10 = 70',score:70,estimated:true},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~72% avg (83% math)',formula:'72',score:72,estimated:true},{name:'High School Rank',weight:0.25,raw:'Medfield High #18 in MA',formula:'100 - 18 = 82',score:82}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 56 min',formula:'100 - (56 - 30) × 2 = 48',score:48,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 36 min',formula:'100 - (36 - 20) × 2.5 = 60',score:60,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$1.076M median',formula:'$900K-$1.05M sweet spot ≈ 90',score:90},{name:'Tax Rate',weight:0.3,raw:'Est ~$10.5 / 1000',formula:'$10 = 70',score:70,estimated:true},{name:'Trend',weight:0.2,raw:'Est ~3-4% annual',formula:'3-7% = 85',score:85,estimated:true}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~66% Harris (exurban, mixed)',formula:'(66 - 30) × 2 = 72',score:72,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 5 per 1,000',formula:'<7 = 95',score:95,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Stable',formula:'Stable = 70',score:70,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Est ~42',formula:'Direct = 42',score:42,estimated:true},{name:'Town Center',weight:0.5,raw:'Limited downtown',formula:'Some = 60',score:60,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~25 restaurants',formula:'20+ = 55',score:55,estimated:true},{name:'Quality',weight:0.6,raw:'Limited, good variety',formula:'Limited = 50',score:50,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Some community events',formula:'Some = 65',score:65,estimated:true},{name:'Character',weight:0.6,raw:'Established suburban character',formula:'Established = 65',score:65,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to commuter rail or shuttle',time:'53-58 min'},
+      massAve:{mode:'Drive via Route 109/Route 128',time:'33-38 min'},
+      stations:['Limited transit access'], line:'Commuter Rail nearby'
+    }}
+  },
+  {
+    id:'dover', name:'Dover', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'8 / 10',formula:'8 × 10 = 80',score:80,estimated:true},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~74% avg',formula:'74',score:74,estimated:true},{name:'High School Rank',weight:0.25,raw:'Dover-Sherborn #11 MA',formula:'100 - 11 = 89',score:89}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 58 min',formula:'100 - (58 - 30) × 2 = 44',score:44,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 38 min',formula:'100 - (38 - 20) × 2.5 = 55',score:55,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$1.6M median',formula:'Above $1.2M = 40',score:40},{name:'Tax Rate',weight:0.3,raw:'Est ~$10.8 / 1000',formula:'$10-12 = 75',score:75,estimated:true},{name:'Trend',weight:0.2,raw:'Est ~4% annual',formula:'3-7% = 85',score:85,estimated:true}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~70% Harris (affluent suburb)',formula:'(70 - 30) × 2 = 80',score:80,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 4 per 1,000 (very safe)',formula:'<7 = 95',score:95,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Stable',formula:'Stable = 70',score:70,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Est ~40',formula:'Direct = 40',score:40,estimated:true},{name:'Town Center',weight:0.5,raw:'Limited downtown',formula:'Some = 60',score:60,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~30 restaurants',formula:'30+ = 70',score:70,estimated:true},{name:'Quality',weight:0.6,raw:'Good variety',formula:'Good = 70',score:70,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Some community events',formula:'Some = 65',score:65,estimated:true},{name:'Character',weight:0.6,raw:'Rural/affluent, established',formula:'Established = 65',score:65,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to commuter rail or shuttle',time:'55-60 min'},
+      massAve:{mode:'Drive via Route 109/Route 128',time:'35-40 min'},
+      stations:['Dover/Sherborn area'], line:'Limited transit'
+    }}
+  },
+  {
+    id:'weston', name:'Weston', county:'Middlesex', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'8 / 10',formula:'8 × 10 = 80',score:80,estimated:true},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~76% avg',formula:'76',score:76,estimated:true},{name:'High School Rank',weight:0.25,raw:'Est ~15th percentile',formula:'100 - 15 = 85',score:85,estimated:true}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 55 min',formula:'100 - (55 - 30) × 2 = 50',score:50,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 35 min',formula:'100 - (35 - 20) × 2.5 = 62.5',score:62,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$2.16M median',formula:'Way above $1.5M = 30',score:30},{name:'Tax Rate',weight:0.3,raw:'$11.12 / 1000 (FY2024)',formula:'$10-12 = 75',score:75},{name:'Trend',weight:0.2,raw:'Est ~3-4% annual',formula:'3-7% = 85',score:85,estimated:true}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~72% Harris (affluent, blue)',formula:'(72 - 30) × 2 = 84',score:84,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 5 per 1,000',formula:'<7 = 95',score:95,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Stable/improving',formula:'Improving = 90',score:90,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Est ~35',formula:'Direct = 35',score:35,estimated:true},{name:'Town Center',weight:0.5,raw:'Limited, rural character',formula:'None = 40',score:40,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~25 restaurants',formula:'20+ = 55',score:55,estimated:true},{name:'Quality',weight:0.6,raw:'Limited options, some upscale',formula:'Limited = 50',score:50,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Some events',formula:'Some = 65',score:65,estimated:true},{name:'Character',weight:0.6,raw:'Strong identity, country/suburban',formula:'Strong = 85',score:85,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to commuter rail',time:'52-58 min'},
+      massAve:{mode:'Drive via Route 20/Route 2',time:'32-38 min'},
+      stations:['Weston'], line:'Commuter Rail'
+    }}
+  },
+  {
+    id:'norwood', name:'Norwood', county:'Norfolk County', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'7 / 10',formula:'rating x 10',score:70},{name:'MCAS Proficiency',weight:0.35,raw:'ELA 45% + Math 44%',formula:'direct %',score:45},{name:'HS Ranking Percentile',weight:0.25,raw:'Niche A-, Top 30%',formula:'100-30=70',score:70}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Norwood Central ~ 45 min',formula:'100-(45-30)x2=70',score:70},{name:'Mass Ave (drive)',weight:0.5,raw:'Rte 1/I-93 ~ 30 min',formula:'100-(30-20)x2.5=75',score:75}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Median $675K',formula:'below $700K=65',score:65},{name:'Tax Rate',weight:0.3,raw:'$9.82/1000',formula:'$10=71',score:71},{name:'Price Trend',weight:0.2,raw:'+9.8% hot',formula:'>9%=68',score:68}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~57% Harris',formula:'(57-30)x2=54',score:54,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'~10 per 1,000',formula:'10=75',score:75},{name:'Trend',weight:0.3,raw:'Stable-positive',formula:'75',score:75}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'55',formula:'direct',score:55},{name:'Town Center Quality',weight:0.5,raw:'Broadway downtown',formula:'some center=62',score:62}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'25+',formula:'25=60',score:60},{name:'Scene Quality',weight:0.6,raw:'Vico, Byblos, solid variety',formula:'good=65',score:65}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Farmers Market, themed events',formula:'active=78',score:78},{name:'Character & Charm',weight:0.6,raw:'Suburban, active programming',formula:'established=62',score:62}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Car -> Norwood Central -> South Station -> Silver Line',time:'40-50 min'},
+      massAve:{mode:'Drive via Rte 1 / I-93',time:'25-35 min'},
+      stations:['Norwood Central','Norwood Depot','Windsor Gardens'], line:'Franklin/Foxboro Line'
+    }}
+  },
+  {
+    id:'norfolk', name:'Norfolk', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 7.0/10',formula:'rating x 10',score:70},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:70},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:70}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:61},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:61}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:71},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:71},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:71}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~58% Harris',formula:'(58-30)x2=56',score:56,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:91},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:51},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:51}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:62},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:62}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:73},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:73}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~50 min'},
+      massAve:{mode:'Drive to South End',time:'~36 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'cohasset', name:'Cohasset', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 7.5/10',formula:'rating x 10',score:75},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:75},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:75}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:50},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:50}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:55},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:55},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:55}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~65% Harris',formula:'(65-30)x2=70',score:70,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:90},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:65},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:65}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:71},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:71}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:80},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:80}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~55 min'},
+      massAve:{mode:'Drive to South End',time:'~40 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'sharon', name:'Sharon', county:'Norfolk County', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'8 / 10',formula:'rating x 10',score:80},{name:'MCAS Proficiency',weight:0.35,raw:'Avg ~67%',formula:'direct %',score:67},{name:'HS Ranking Percentile',weight:0.25,raw:'Top 12%',formula:'100-12=88',score:88}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Sharon Stn ~ 55 min',formula:'100-(55-30)x2=50',score:50},{name:'Mass Ave (drive)',weight:0.5,raw:'I-95/I-93 ~ 40 min',formula:'100-(40-20)x2.5=50',score:50}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Median est $900K',formula:'$900K=92',score:92},{name:'Tax Rate',weight:0.3,raw:'$15.36/1000',formula:'$15+=35',score:35},{name:'Price Trend',weight:0.2,raw:'4-6% YoY',formula:'3-7%=85',score:85}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~65% Harris',formula:'(65-30)x2=70',score:70,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'~3 per 1,000',formula:'<7=95',score:95},{name:'Trend',weight:0.3,raw:'Stable',formula:'stable=70',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'55',formula:'direct',score:55},{name:'Town Center Quality',weight:0.5,raw:'Some center, car-dependent',formula:'some=55',score:55}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'20+',formula:'20+=55',score:55},{name:'Scene Quality',weight:0.6,raw:'Limited but quality local',formula:'limited=45',score:45}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Community programming',formula:'some=62',score:62},{name:'Character & Charm',weight:0.6,raw:'Quiet, safe, family-friendly',formula:'established=62',score:62}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Car -> Sharon Station -> South Station -> Silver Line',time:'50-60 min'},
+      massAve:{mode:'Drive via I-95 / I-93',time:'35-45 min'},
+      stations:['Sharon Station'], line:'Providence/Stoughton Line'
+    }}
+  },
+  {
+    id:'foxborough', name:'Foxborough', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 7.3/10',formula:'rating x 10',score:73},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:73},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:73}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:54},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:54}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:84},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:84},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:84}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~56% Harris',formula:'(56-30)x2=52',score:52,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:70},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:43},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:43}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:68},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:68}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:70},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:70}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~53 min'},
+      massAve:{mode:'Drive to South End',time:'~38 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'sherborn', name:'Sherborn', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'7 / 10',formula:'7 × 10 = 70',score:70,estimated:true},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~73% avg',formula:'73',score:73,estimated:true},{name:'High School Rank',weight:0.25,raw:'Dover-Sherborn #11 MA',formula:'100 - 11 = 89',score:89}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 58 min',formula:'100 - (58 - 30) × 2 = 44',score:44,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 38 min',formula:'100 - (38 - 20) × 2.5 = 55',score:55,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$1.17M median',formula:'$900K-$1.05M sweet spot ≈ 85',score:85,estimated:true},{name:'Tax Rate',weight:0.3,raw:'Est ~$10.3 / 1000',formula:'$10 = 70',score:70,estimated:true},{name:'Trend',weight:0.2,raw:'Est ~3% annual',formula:'3-7% = 85',score:85,estimated:true}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~68% Harris (exurban)',formula:'(68 - 30) × 2 = 76',score:76,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 4 per 1,000',formula:'<7 = 95',score:95,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Stable',formula:'Stable = 70',score:70,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Est ~35',formula:'Direct = 35',score:35,estimated:true},{name:'Town Center',weight:0.5,raw:'Limited, rural character',formula:'None = 40',score:40,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~20 restaurants',formula:'20+ = 55',score:55,estimated:true},{name:'Quality',weight:0.6,raw:'Limited options',formula:'Limited = 50',score:50,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Minimal events',formula:'Minimal = 45',score:45,estimated:true},{name:'Character',weight:0.6,raw:'Rural, established',formula:'Established = 65',score:65,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to commuter rail',time:'55-60 min'},
+      massAve:{mode:'Drive via Route 27/Route 109',time:'35-40 min'},
+      stations:['Limited transit'], line:'Limited access'
+    }}
+  },
+  {
+    id:'marshfield', name:'Marshfield', county:'Plymouth', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 6.9/10',formula:'rating x 10',score:69},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:69},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:69}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:50},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:50}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:74},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:74},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:74}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~60% Harris',formula:'(60-30)x2=60',score:60,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:80},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:59},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:59}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:70},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:70}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:75},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:75}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~55 min'},
+      massAve:{mode:'Drive to South End',time:'~40 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'medway', name:'Medway', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 8.1/10',formula:'rating x 10',score:81},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:81},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:81}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:43},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:43}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:75},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:75},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:75}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~59% Harris',formula:'(59-30)x2=58',score:58,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:90},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:51},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:51}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:60},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:60}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:65},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:65}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~58 min'},
+      massAve:{mode:'Drive to South End',time:'~43 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'randolph', name:'Randolph', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 5.5/10',formula:'rating x 10',score:55},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:55},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:55}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:67},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:67}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:80},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:80},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:80}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~56% Harris',formula:'(56-30)x2=52',score:52,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:72},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:53},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:53}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:69},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:69}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:60},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:60}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~46 min'},
+      massAve:{mode:'Drive to South End',time:'~33 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'mansfield', name:'Mansfield', county:'Bristol', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 7.9/10',formula:'rating x 10',score:79},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:79},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:79}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:46},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:46}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:78},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:78},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:78}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~54% Harris',formula:'(54-30)x2=48',score:48,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:80},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:44},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:44}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:65},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:65}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:63},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:63}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~57 min'},
+      massAve:{mode:'Drive to South End',time:'~42 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'weymouth', name:'Weymouth', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 4.6/10',formula:'rating x 10',score:46},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:46},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:46}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:70},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:70}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:71},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:71},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:71}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~58% Harris',formula:'(58-30)x2=56',score:56,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:62},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:60},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:60}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:81},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:81}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:63},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:63}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~45 min'},
+      massAve:{mode:'Drive to South End',time:'~32 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'holliston', name:'Holliston', county:'Middlesex', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'6 / 10',formula:'6 × 10 = 60',score:60,estimated:true},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~65% avg',formula:'65',score:65,estimated:true},{name:'High School Rank',weight:0.25,raw:'Est ~50th percentile',formula:'100 - 50 = 50',score:50,estimated:true}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 54 min',formula:'100 - (54 - 30) × 2 = 52',score:52,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 33 min',formula:'100 - (33 - 20) × 2.5 = 67.5',score:67,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$754K median',formula:'Below $900K = 80',score:80,estimated:true},{name:'Tax Rate',weight:0.3,raw:'Est ~$10.8 / 1000',formula:'$10-12 = 75',score:75,estimated:true},{name:'Trend',weight:0.2,raw:'Est ~2% annual',formula:'Stable = 60',score:60,estimated:true}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~61% Harris (suburban, mixed)',formula:'(61 - 30) × 2 = 62',score:62,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 6 per 1,000',formula:'<7 = 95',score:95,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Stable/improving',formula:'Improving = 90',score:90,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Est ~38',formula:'Direct = 38',score:38,estimated:true},{name:'Town Center',weight:0.5,raw:'Limited downtown',formula:'Some = 60',score:60,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~25 restaurants',formula:'20+ = 55',score:55,estimated:true},{name:'Quality',weight:0.6,raw:'Limited options',formula:'Limited = 50',score:50,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Some community events',formula:'Some = 65',score:65,estimated:true},{name:'Character',weight:0.6,raw:'Established suburban',formula:'Established = 65',score:65,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to commuter rail or express bus',time:'51-56 min'},
+      massAve:{mode:'Drive via Route 16/Route 108',time:'30-35 min'},
+      stations:['Limited transit access'], line:'Limited'
+    }}
+  },
+  {
+    id:'rockland', name:'Rockland', county:'Plymouth', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 5.3/10',formula:'rating x 10',score:53},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:53},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:53}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:63},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:63}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:79},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:79},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:79}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~53% Harris',formula:'(53-30)x2=46',score:46,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:72},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:55},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:55}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:67},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:67}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:60},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:60}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~48 min'},
+      massAve:{mode:'Drive to South End',time:'~35 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'bridgewater', name:'Bridgewater', county:'Plymouth', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 6.6/10',formula:'rating x 10',score:66},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:66},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:66}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:55},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:55}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:73},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:73},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:73}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~52% Harris',formula:'(52-30)x2=44',score:44,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:71},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:50},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:50}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:63},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:63}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:60},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:60}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~52 min'},
+      massAve:{mode:'Drive to South End',time:'~38 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'avon', name:'Avon', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 5.4/10',formula:'rating x 10',score:54},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:54},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:54}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:62},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:62}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:79},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:79},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:79}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~55% Harris',formula:'(55-30)x2=50',score:50,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:70},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:49},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:49}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:63},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:63}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:59},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:59}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~49 min'},
+      massAve:{mode:'Drive to South End',time:'~35 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'hopkinton', name:'Hopkinton', county:'Middlesex/Worcester', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'6 / 10',formula:'6 × 10 = 60',score:60,estimated:true},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~66% avg',formula:'66',score:66,estimated:true},{name:'High School Rank',weight:0.25,raw:'Est ~50th percentile',formula:'100 - 50 = 50',score:50,estimated:true}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 58 min',formula:'100 - (58 - 30) × 2 = 44',score:44,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 38 min',formula:'100 - (38 - 20) × 2.5 = 55',score:55,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$1.01M median',formula:'$900K-$1.05M sweet spot ≈ 95',score:95,estimated:true},{name:'Tax Rate',weight:0.3,raw:'Est ~$10.2 / 1000',formula:'$10 = 70',score:70,estimated:true},{name:'Trend',weight:0.2,raw:'Est ~3% annual',formula:'3-7% = 85',score:85,estimated:true}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~59% Harris (exurban, mixed)',formula:'(59 - 30) × 2 = 58',score:58,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 5 per 1,000',formula:'<7 = 95',score:95,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Stable',formula:'Stable = 70',score:70,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Est ~36',formula:'Direct = 36',score:36,estimated:true},{name:'Town Center',weight:0.5,raw:'Limited downtown',formula:'Some = 60',score:60,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~22 restaurants',formula:'20+ = 55',score:55,estimated:true},{name:'Quality',weight:0.6,raw:'Limited options',formula:'Limited = 50',score:50,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Some events (Boston Marathon)',formula:'Some = 65',score:65,estimated:true},{name:'Character',weight:0.6,raw:'Established suburban',formula:'Established = 65',score:65,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to commuter rail or shuttle',time:'55-60 min'},
+      massAve:{mode:'Drive via Route 135/Route 9',time:'35-40 min'},
+      stations:['Limited transit'], line:'Limited access'
+    }}
+  },
+  {
+    id:'framingham', name:'Framingham', county:'Middlesex', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'3 / 10',formula:'3 × 10 = 30',score:30},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~52% avg',formula:'52',score:52,estimated:true},{name:'High School Rank',weight:0.25,raw:'Est ~60th percentile',formula:'100 - 60 = 40',score:40,estimated:true}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 48 min',formula:'100 - (48 - 30) × 2 = 64',score:64,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 30 min',formula:'100 - (30 - 20) × 2.5 = 75',score:75,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$675K median',formula:'Below $700K = 65',score:65},{name:'Tax Rate',weight:0.3,raw:'Est ~$10.8 / 1000',formula:'$10-12 = 75',score:75,estimated:true},{name:'Trend',weight:0.2,raw:'Est ~2% annual',formula:'Stable = 60',score:60,estimated:true}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~62% Harris (moderate, diverse)',formula:'(62 - 30) × 2 = 64',score:64,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 11 per 1,000',formula:'10-15 = 75 → 15 = 55',score:65,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Est stable',formula:'Stable = 70',score:70,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'42',formula:'Direct = 42',score:42},{name:'Town Center',weight:0.5,raw:'Some downtown, mixed character',formula:'Some = 60',score:60,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'177 restaurants (Tripadvisor)',formula:'50+ = 85',score:85},{name:'Quality',weight:0.6,raw:'Diverse, casual and upscale',formula:'Good/diverse = 70',score:70,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Some events, mixed character',formula:'Some = 65',score:65,estimated:true},{name:'Character',weight:0.6,raw:'Diverse, industrial/commercial',formula:'Some character = 65',score:65,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to commuter rail',time:'45-50 min'},
+      massAve:{mode:'Drive via Route 9 or Route 126',time:'28-32 min'},
+      stations:['Framingham Station (MBTA)'], line:'Framingham Commuter Rail Line'
+    }}
+  },
+  {
+    id:'hull', name:'Hull', county:'Plymouth', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 4.8/10',formula:'rating x 10',score:48},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:48},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:48}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:56},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:56}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:71},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:71},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:71}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~58% Harris',formula:'(58-30)x2=56',score:56,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:72},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:65},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:65}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:62},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:62}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:77},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:77}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~52 min'},
+      massAve:{mode:'Drive to South End',time:'~38 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'abington', name:'Abington', county:'Plymouth', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 5.2/10',formula:'rating x 10',score:52},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:52},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:52}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:58},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:58}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:75},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:75},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:75}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~54% Harris',formula:'(54-30)x2=48',score:48,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:60},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:54},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:54}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:66},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:66}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:59},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:59}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~51 min'},
+      massAve:{mode:'Drive to South End',time:'~37 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'norwell', name:'Norwell', county:'Plymouth County', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'8 / 10',formula:'rating x 10',score:80},{name:'MCAS Proficiency',weight:0.35,raw:'~72%',formula:'direct %',score:72},{name:'HS Ranking Percentile',weight:0.25,raw:'Top 15%',formula:'100-15=85',score:85}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Drive to Greenbush ~ 62 min',formula:'100-(62-30)x2=36',score:36},{name:'Mass Ave (drive)',weight:0.5,raw:'Rte 3/I-93 ~ 45 min',formula:'100-(45-20)x2.5=37',score:37}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Median $1,125,000',formula:'top of range=75',score:75},{name:'Tax Rate',weight:0.3,raw:'Est ~$13/1000',formula:'$13=50',score:50},{name:'Price Trend',weight:0.2,raw:'+26.8% hot',formula:'>20%=45',score:45}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~52% Harris',formula:'(52-30)x2=44',score:44,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'~7 per 1,000',formula:'7=93',score:93},{name:'Trend',weight:0.3,raw:'Stable',formula:'stable=70',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'55',formula:'direct',score:55},{name:'Town Center Quality',weight:0.5,raw:'Norwell Center village',formula:'some=55',score:55}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'15+',formula:'15=42',score:42},{name:'Scene Quality',weight:0.6,raw:'Cheever Tavern, limited',formula:'limited quality=50',score:50}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Schools, beaches',formula:'some=58',score:58},{name:'Character & Charm',weight:0.6,raw:'Affluent South Shore',formula:'affluent suburb=65',score:65}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to Greenbush -> South Station -> Silver Line',time:'55-70 min'},
+      massAve:{mode:'Drive via Rte 3 / I-93',time:'40-50 min'},
+      stations:['None - nearest Greenbush'], line:'Greenbush Line'
+    }}
+  },
+  {
+    id:'ashland', name:'Ashland', county:'Middlesex', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'5 / 10',formula:'5 × 10 = 50',score:50},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~58% avg',formula:'58',score:58,estimated:true},{name:'High School Rank',weight:0.25,raw:'Est ~60th percentile',formula:'100 - 60 = 40',score:40,estimated:true}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 52 min',formula:'100 - (52 - 30) × 2 = 56',score:56,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 32 min',formula:'100 - (32 - 20) × 2.5 = 70',score:70,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$599.9K median',formula:'Below $700K = 65',score:65},{name:'Tax Rate',weight:0.3,raw:'Est ~$10.5 / 1000',formula:'$10 = 70',score:70,estimated:true},{name:'Trend',weight:0.2,raw:'Est ~1-2% annual',formula:'Stable = 60',score:60,estimated:true}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~58% Harris (exurban, mixed)',formula:'(58 - 30) × 2 = 56',score:56,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 7 per 1,000',formula:'<7 = 95 → 8 = 85',score:85,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Stable',formula:'Stable = 70',score:70,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Est ~40',formula:'Direct = 40',score:40,estimated:true},{name:'Town Center',weight:0.5,raw:'Limited downtown',formula:'Some = 60',score:60,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~22 restaurants',formula:'20+ = 55',score:55,estimated:true},{name:'Quality',weight:0.6,raw:'Limited, some ethnic variety',formula:'Limited = 50',score:50,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Minimal events',formula:'Minimal = 45',score:45,estimated:true},{name:'Character',weight:0.6,raw:'Generic suburban',formula:'Generic = 45',score:45,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to commuter rail',time:'50-55 min'},
+      massAve:{mode:'Drive via Route 126/Route 9',time:'30-35 min'},
+      stations:['Ashland Station area'], line:'Commuter Rail nearby'
+    }}
+  },
+  {
+    id:'whitman', name:'Whitman', county:'Plymouth', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 5.1/10',formula:'rating x 10',score:51},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:51},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:51}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:55},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:55}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:78},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:78},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:78}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~52% Harris',formula:'(52-30)x2=44',score:44,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:63},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:55},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:55}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:65},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:65}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:59},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:59}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~52 min'},
+      massAve:{mode:'Drive to South End',time:'~38 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'millis', name:'Millis', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'5 / 10',formula:'5 × 10 = 50',score:50,estimated:true},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~60% avg',formula:'60',score:60,estimated:true},{name:'High School Rank',weight:0.25,raw:'Est ~55th percentile',formula:'100 - 55 = 45',score:45,estimated:true}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 55 min',formula:'100 - (55 - 30) × 2 = 50',score:50,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 35 min',formula:'100 - (35 - 20) × 2.5 = 62.5',score:62,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$707K median',formula:'Below $700K-$900K = 75',score:75,estimated:true},{name:'Tax Rate',weight:0.3,raw:'Est ~$11.0 / 1000',formula:'$10-12 = 75',score:75,estimated:true},{name:'Trend',weight:0.2,raw:'Est ~2% annual',formula:'Stable = 60',score:60,estimated:true}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~60% Harris (exurban, mixed)',formula:'(60 - 30) × 2 = 60',score:60,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 7 per 1,000',formula:'<7 = 95 → 8 = 85',score:85,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Stable',formula:'Stable = 70',score:70,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Est ~38',formula:'Direct = 38',score:38,estimated:true},{name:'Town Center',weight:0.5,raw:'Limited downtown',formula:'Some = 60',score:60,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~20 restaurants',formula:'20+ = 55',score:55,estimated:true},{name:'Quality',weight:0.6,raw:'Limited options',formula:'Limited = 50',score:50,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Minimal events',formula:'Minimal = 45',score:45,estimated:true},{name:'Character',weight:0.6,raw:'Generic suburban',formula:'Generic = 45',score:45,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to commuter rail or express bus',time:'52-57 min'},
+      massAve:{mode:'Drive via Route 109',time:'32-37 min'},
+      stations:['Limited transit access'], line:'Limited'
+    }}
+  },
+  {
+    id:'holbrook', name:'Holbrook', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 4.3/10',formula:'rating x 10',score:43},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:43},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:43}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:66},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:66}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:73},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:73},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:73}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~53% Harris',formula:'(53-30)x2=46',score:46,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:61},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:49},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:49}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:56},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:56}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:57},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:57}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~47 min'},
+      massAve:{mode:'Drive to South End',time:'~34 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'stoughton', name:'Stoughton', county:'Norfolk County', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'6 / 10',formula:'rating x 10',score:60},{name:'MCAS Proficiency',weight:0.35,raw:'~40%',formula:'direct %',score:40},{name:'HS Ranking Percentile',weight:0.25,raw:'Top 50%',formula:'100-50=50',score:50}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Stoughton Stn ~ 55 min',formula:'100-(55-30)x2=50',score:50},{name:'Mass Ave (drive)',weight:0.5,raw:'Rte 24/I-93 ~ 40 min',formula:'100-(40-20)x2.5=50',score:50}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Median $555K',formula:'far below=52',score:52},{name:'Tax Rate',weight:0.3,raw:'$7.89/1000',formula:'$7-8=90',score:90},{name:'Price Trend',weight:0.2,raw:'2-4%',formula:'2-4%=75',score:75}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~58% Harris',formula:'(58-30)x2=56',score:56,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'15 per 1,000',formula:'15=55',score:55},{name:'Trend',weight:0.3,raw:'Stable',formula:'stable=70',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'55',formula:'direct',score:55},{name:'Town Center Quality',weight:0.5,raw:'Historic downtown revitalizing',formula:'developing=52',score:52}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'30+',formula:'30+=70',score:70},{name:'Scene Quality',weight:0.6,raw:'Chateau, Seoul Gourmet, diverse',formula:'diverse=72',score:72}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Farmers Market, disc golf, paddling',formula:'active=75',score:75},{name:'Character & Charm',weight:0.6,raw:'Historic, revitalizing, community-focused',formula:'developing=65',score:65}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Car -> Stoughton Station -> South Station -> Silver Line',time:'50-60 min'},
+      massAve:{mode:'Drive via Rte 24 / I-93',time:'35-45 min'},
+      stations:['Stoughton Station'], line:'Providence/Stoughton Line'
+    }}
+  },
+  {
+    id:'grafton', name:'Grafton', county:'Worcester', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'6 / 10',formula:'6 × 10 = 60',score:60,estimated:true},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~62% avg',formula:'62',score:62,estimated:true},{name:'High School Rank',weight:0.25,raw:'Est ~50th percentile',formula:'100 - 50 = 50',score:50,estimated:true}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 60 min',formula:'100 - (60 - 30) × 2 = 40',score:40,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 40 min',formula:'100 - (40 - 20) × 2.5 = 50',score:50,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$615K median',formula:'Below $700K = 65',score:65},{name:'Tax Rate',weight:0.3,raw:'Est ~$10.4 / 1000',formula:'$10 = 70',score:70,estimated:true},{name:'Trend',weight:0.2,raw:'Est ~2% annual',formula:'Stable = 60',score:60,estimated:true}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~57% Harris (exurban)',formula:'(57 - 30) × 2 = 54',score:54,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 6 per 1,000',formula:'<7 = 95',score:95,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Stable',formula:'Stable = 70',score:70,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Est ~35',formula:'Direct = 35',score:35,estimated:true},{name:'Town Center',weight:0.5,raw:'Limited downtown',formula:'Some = 60',score:60,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~20 restaurants',formula:'20+ = 55',score:55,estimated:true},{name:'Quality',weight:0.6,raw:'Limited options',formula:'Limited = 50',score:50,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Some community events',formula:'Some = 65',score:65,estimated:true},{name:'Character',weight:0.6,raw:'Established suburban/exurban',formula:'Established = 65',score:65,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to commuter rail or highway',time:'57-63 min'},
+      massAve:{mode:'Drive via Route 140/Route 2',time:'38-43 min'},
+      stations:['Limited transit'], line:'Limited access'
+    }}
+  },
+  {
+    id:'easton', name:'Easton', county:'Bristol County', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'7 / 10',formula:'rating x 10',score:70},{name:'MCAS Proficiency',weight:0.35,raw:'~65%',formula:'direct %',score:65},{name:'HS Ranking Percentile',weight:0.25,raw:'Top 18%',formula:'100-18=82',score:82}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'No station ~ 67 min',formula:'100-(67-30)x2=26',score:26},{name:'Mass Ave (drive)',weight:0.5,raw:'Rte 24/I-93 ~ 45 min',formula:'100-(45-20)x2.5=37',score:37}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Median est $625K',formula:'$625K=58',score:58},{name:'Tax Rate',weight:0.3,raw:'$13.35/1000',formula:'$13+=48',score:48},{name:'Price Trend',weight:0.2,raw:'4-6%',formula:'3-7%=85',score:85}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~50% Harris',formula:'(50-30)x2=40',score:40,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'~10 per 1,000',formula:'10=75',score:75},{name:'Trend',weight:0.3,raw:'Stable',formula:'stable=70',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'55',formula:'direct',score:55},{name:'Town Center Quality',weight:0.5,raw:'N Easton village',formula:'some village=55',score:55}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'28+',formula:'28=65',score:65},{name:'Scene Quality',weight:0.6,raw:'Giana, Porticello, growing',formula:'growing=62',score:62}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Oldest farmers market (1752!)',formula:'very active=90',score:90},{name:'Character & Charm',weight:0.6,raw:'Rich heritage, developing',formula:'strong identity=82',score:82}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to Stoughton -> rail -> South Station -> Silver Line',time:'60-75 min'},
+      massAve:{mode:'Drive via Rte 24 / I-93',time:'40-50 min'},
+      stations:['None - drive to Stoughton'], line:'N/A'
+    }}
+  },
+  {
+    id:'plainville', name:'Plainville', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 7.2/10',formula:'rating x 10',score:72},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:72},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:72}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:27},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:27}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:75},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:75},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:75}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~55% Harris',formula:'(55-30)x2=50',score:50,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:77},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:41},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:41}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:56},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:56}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:58},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:58}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~66 min'},
+      massAve:{mode:'Drive to South End',time:'~49 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'wrentham', name:'Wrentham', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 7.2/10',formula:'rating x 10',score:72},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:72},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:72}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:16},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:16}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:74},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:74},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:74}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~53% Harris',formula:'(53-30)x2=46',score:46,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:78},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:40},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:40}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:58},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:58}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:58},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:58}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~72 min'},
+      massAve:{mode:'Drive to South End',time:'~54 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'upton', name:'Upton', county:'Worcester', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'5 / 10',formula:'5 × 10 = 50',score:50,estimated:true},{name:'MCAS Proficiency',weight:0.35,raw:'Est ~60% avg',formula:'60',score:60,estimated:true},{name:'High School Rank',weight:0.25,raw:'Est ~55th percentile',formula:'100 - 55 = 45',score:45,estimated:true}] },
+      commute: { submetrics: [{name:'Fan Pier',weight:0.5,raw:'Est 62 min',formula:'100 - (62 - 30) × 2 = 36',score:36,estimated:true},{name:'Mass Ave',weight:0.5,raw:'Est 42 min',formula:'100 - (42 - 20) × 2.5 = 45',score:45,estimated:true}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'$729K median',formula:'Below $900K = 80',score:80,estimated:true},{name:'Tax Rate',weight:0.3,raw:'Est ~$10.0 / 1000',formula:'$10 = 70',score:70,estimated:true},{name:'Trend',weight:0.2,raw:'Est ~2% annual',formula:'Stable = 60',score:60,estimated:true}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~56% Harris (exurban)',formula:'(56 - 30) × 2 = 52',score:52,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Est 6 per 1,000',formula:'<7 = 95',score:95,estimated:true},{name:'Crime Trend',weight:0.3,raw:'Stable',formula:'Stable = 70',score:70,estimated:true}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Est ~32',formula:'Direct = 32',score:32,estimated:true},{name:'Town Center',weight:0.5,raw:'Limited, rural',formula:'None = 40',score:40,estimated:true}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Est ~18 restaurants',formula:'<15 = 40 → 20+ = 55',score:45,estimated:true},{name:'Quality',weight:0.6,raw:'Limited options',formula:'Very limited = 35',score:35,estimated:true}] },
+      community: { submetrics: [{name:'Events',weight:0.4,raw:'Minimal events',formula:'Minimal = 45',score:45,estimated:true},{name:'Character',weight:0.6,raw:'Rural, exurban',formula:'Generic = 45',score:45,estimated:true}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Drive to commuter rail or highway',time:'60-65 min'},
+      massAve:{mode:'Drive via Route 140/Route 495',time:'40-45 min'},
+      stations:['Minimal transit'], line:'Limited access'
+    }}
+  },
+  {
+    id:'raynham', name:'Raynham', county:'Bristol', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 5.2/10',formula:'rating x 10',score:52},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:52},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:52}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:30},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:30}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:74},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:74},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:74}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~51% Harris',formula:'(51-30)x2=42',score:42,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:73},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:41},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:41}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:51},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:51}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:58},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:58}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~65 min'},
+      massAve:{mode:'Drive to South End',time:'~48 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'attleboro', name:'Attleboro', county:'Bristol', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 4.3/10',formula:'rating x 10',score:43},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:43},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:43}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:28},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:28}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:75},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:75},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:75}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~50% Harris',formula:'(50-30)x2=40',score:40,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:66},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:52},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:52}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:65},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:65}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:60},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:60}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~66 min'},
+      massAve:{mode:'Drive to South End',time:'~49 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  },
+  {
+    id:'bellingham', name:'Bellingham', county:'Norfolk', overrides:{},
+    rubric: {
+      schools: { submetrics: [{name:'GreatSchools Rating',weight:0.4,raw:'Est 3.2/10',formula:'rating x 10',score:32},{name:'MCAS Proficiency',weight:0.35,raw:'Est based on regional data',formula:'direct %',score:32},{name:'HS Ranking Percentile',weight:0.25,raw:'Est from available data',formula:'100 - percentile',score:32}] },
+      commute: { submetrics: [{name:'Fan Pier (rail+transit)',weight:0.5,raw:'Estimated via commuter rail + subway',formula:'100-(min-30)x2',score:21},{name:'Mass Ave (drive)',weight:0.5,raw:'Estimated peak drive time',formula:'100-(min-20)x2.5',score:21}] },
+      housing: { submetrics: [{name:'Budget Fit',weight:0.5,raw:'Based on median home price',formula:'sweet spot scoring',score:71},{name:'Tax Rate',weight:0.3,raw:'Regional estimate',formula:'tax rate scale',score:71},{name:'Price Trend',weight:0.2,raw:'Regional trend estimate',formula:'trend scale',score:71}] },
+      political: { submetrics: [{name:'2024 Dem Vote Share',weight:1.0,raw:'Est ~52% Harris',formula:'(52-30)x2=44',score:44,estimated:true}] },
+      safety: { submetrics: [{name:'Crime Rate',weight:0.7,raw:'Based on per-1K rate',formula:'crime scale',score:74},{name:'Trend',weight:0.3,raw:'Estimated stable',formula:'trend scale',score:70}] },
+      walkability: { submetrics: [{name:'Walk Score',weight:0.5,raw:'Estimated walk score',formula:'direct',score:43},{name:'Town Center Quality',weight:0.5,raw:'Based on town character',formula:'center scale',score:43}] },
+      dining: { submetrics: [{name:'Restaurant Count',weight:0.4,raw:'Estimated restaurant count',formula:'count scale',score:53},{name:'Scene Quality',weight:0.6,raw:'Based on dining diversity',formula:'quality scale',score:53}] },
+      community: { submetrics: [{name:'Events & Programming',weight:0.4,raw:'Based on community features',formula:'events scale',score:52},{name:'Character & Charm',weight:0.6,raw:'Based on town character',formula:'character scale',score:52}] }
+    },
+    details: { commute: {
+      fanPier:{mode:'Commuter rail + subway to Seaport',time:'~70 min'},
+      massAve:{mode:'Drive to South End',time:'~52 min'},
+      stations:['Check MBTA'], line:'See MBTA map'
+    }}
+  }
+];
+
+// ===== SCORING ENGINE =====
+function calcCategoryScore(town, cat) {
+  if (town.overrides[cat] !== undefined) return town.overrides[cat];
+  return town.rubric[cat].submetrics.reduce((sum, s) => sum + s.score * s.weight, 0);
+}
+function calcComposite(town) {
+  const tw = Object.values(weights).reduce((a,b)=>a+b,0);
+  if (!tw) return 0;
+  return Math.round(CATEGORIES.reduce((s,c) => s + calcCategoryScore(town,c)*(weights[c]/tw), 0)*10)/10;
+}
+function getTier(s) { return s>=78?'S':s>=72?'A':s>=66?'B':s>=60?'C':s>=54?'D':s>=48?'E':'F'; }
+function getTierColor(t) { return {S:'#ff6b9d',A:'#c084fc',B:'#6c7bff',C:'#38bdf8',D:'#34d399',E:'#fbbf24',F:'#f87171'}[t]||'#888'; }
+function getScoreColor(s) { return getTierColor(getTier(s)); }
+
+// ===== RENDERING =====
+function renderTierView(filtered) {
+  const byTier={}; TIER_ORDER.forEach(t=>byTier[t]=[]);
+  filtered.forEach(t=>byTier[getTier(calcComposite(t))].push(t));
+  Object.values(byTier).forEach(a=>a.sort((x,y)=>calcComposite(y)-calcComposite(x)));
+  let h='';
+  for (const tier of TIER_ORDER) {
+    if (!visibleTiers.has(tier)) continue;
+    const a=byTier[tier], c=getTierColor(tier);
+    h+=`<div class="tier-section"><div class="tier-header"><div class="tier-label" style="background:${c}22;color:${c};">${tier}</div><span>${tier==='S'?'78+':tier==='A'?'72-77':tier==='B'?'66-71':tier==='C'?'60-65':tier==='D'?'54-59':tier==='E'?'48-53':'<48'} · ${a.length} town${a.length!==1?'s':''}</span></div><div class="tier-row">`;
+    if(!a.length) h+=`<div style="color:var(--text-dim);font-size:13px;padding:10px 0;">No towns</div>`;
+    for (const t of a) {
+      const comp=calcComposite(t);
+      h+=`<div class="town-card" onclick="openDetail('${t.id}')"><div class="name">${t.name}</div><div class="score">${comp.toFixed(1)} pts</div><div class="mini-bars">`;
+      for (const cat of CATEGORIES) { const s=calcCategoryScore(t,cat); h+=`<div class="mini-bar" title="${CAT_LABELS[cat]}: ${Math.round(s)}"><div class="fill" style="width:${s}%;background:${getScoreColor(s)};"></div></div>`; }
+      h+=`</div></div>`;
+    }
+    h+=`</div></div>`;
+  }
+  return h;
+}
+function renderTableView(filtered) {
+  const sorted=[...filtered].sort((a,b)=>{
+    if(sortCol==='composite') return sortDir*(calcComposite(b)-calcComposite(a));
+    if(sortCol==='name') return sortDir*a.name.localeCompare(b.name);
+    return sortDir*(calcCategoryScore(b,sortCol)-calcCategoryScore(a,sortCol));
+  });
+  const ar=c=>sortCol===c?(sortDir===-1?' ▼':' ▲'):'';
+  const cl=c=>sortCol===c?' class="sorted"':'';
+  let h=`<div class="table-container"><table><thead><tr><th${cl('name')} onclick="sortBy('name')">Town${ar('name')}</th><th${cl('composite')} onclick="sortBy('composite')">Tier${ar('composite')}</th><th${cl('composite')} onclick="sortBy('composite')">Score${ar('composite')}</th>`;
+  for (const cat of CATEGORIES) h+=`<th${cl(cat)} onclick="sortBy('${cat}')">${CAT_LABELS[cat]}${ar(cat)}</th>`;
+  h+=`</tr></thead><tbody>`;
+  for (const t of sorted) {
+    const comp=calcComposite(t), tier=getTier(comp);
+    h+=`<tr onclick="openDetail('${t.id}')"><td style="font-weight:600;">${t.name}</td><td><span class="tier-badge tier-${tier.toLowerCase()}">${tier}</span></td><td>${comp.toFixed(1)}</td>`;
+    for (const cat of CATEGORIES) { const s=calcCategoryScore(t,cat); h+=`<td><div class="cat-score-bar"><div class="bar"><div class="fill" style="width:${s}%;background:${getScoreColor(s)};"></div></div><div class="val">${Math.round(s)}</div></div></td>`; }
+    h+=`</tr>`;
+  }
+  return h+`</tbody></table></div>`;
+}
+function render() {
+  const f=towns.filter(t=>visibleTiers.has(getTier(calcComposite(t))));
+  document.getElementById('view-container').innerHTML=currentView==='tier'?renderTierView(f):renderTableView(f);
+}
+
+// ===== DETAIL PANEL =====
+function openDetail(id) {
+  const town=towns.find(t=>t.id===id); if(!town) return;
+  const comp=calcComposite(town), tier=getTier(comp), color=getTierColor(tier), d=town.details;
+  document.getElementById('detail-name').textContent=town.name;
+  document.getElementById('detail-county').textContent=town.county;
+  let h=`<div class="detail-tier-big" style="color:${color};">${tier}</div><div class="detail-score-big">Composite Score: ${comp.toFixed(1)} / 100</div>`;
+  h+=`<div style="margin-bottom:8px;font-size:12px;color:var(--text-dim);">Click any category to see the scoring breakdown ▼</div>`;
+
+  for (const cat of CATEGORIES) {
+    const cs=calcCategoryScore(town,cat), ct=getTier(cs), cc=getTierColor(ct);
+    const isOv=town.overrides[cat]!==undefined;
+    const subs=town.rubric[cat].submetrics, wp=weights[cat];
+    const hasEst=subs.some(s=>s.estimated);
+    h+=`<div class="rubric-card" id="rubric-${town.id}-${cat}" onclick="toggleRubric('${town.id}','${cat}')">
+      <div class="rubric-card-header"><div class="left">
+        <span class="tier-badge tier-${ct.toLowerCase()}" style="width:26px;height:22px;font-size:11px;">${ct}</span>
+        <span class="cat-name">${CAT_LABELS[cat]}</span><span class="cat-weight">${wp}%</span>
+        ${isOv?'<span style="color:var(--accent);font-size:10px;">OVERRIDE</span>':''}
+        ${hasEst?'<span class="est-badge">EST</span>':''}
+      </div><div class="right">
+        <span class="cat-score" style="color:${cc};">${Math.round(cs)}</span>
+        <span class="expand-arrow">▼</span>
+      </div></div><div class="rubric-card-body">`;
+    for (const s of subs) {
+      const sc=getScoreColor(s.score);
+      h+=`<div class="sub-metric"><div class="sub-metric-header">
+        <span class="sub-metric-name">${s.name} <span style="font-size:10px;">(${Math.round(s.weight*100)}%)</span>${s.estimated?'<span class="est-badge">EST</span>':''}</span>
+        <span class="sub-metric-val" style="color:${sc};">${s.score}</span>
+      </div><div class="sub-metric-bar"><div class="fill" style="width:${s.score}%;background:${sc};"></div></div>
+      <div class="sub-metric-detail">Raw: <span class="raw">${s.raw}</span></div>
+      <div class="sub-metric-detail">Formula: <code style="background:var(--surface);padding:1px 4px;border-radius:3px;">${s.formula}</code></div></div>`;
+    }
+    const cp=subs.map(s=>`${s.score}×${s.weight}`), cr=subs.reduce((sum,s)=>sum+s.score*s.weight,0);
+    h+=`<div class="rubric-formula">${CAT_LABELS[cat]} = ${cp.join(' + ')} = <strong>${cr.toFixed(1)}</strong>${isOv?` → overridden to <strong style="color:var(--accent);">${town.overrides[cat]}</strong>`:''}</div>`;
+    h+=`</div></div>`;
+  }
+
+  // Composite formula
+  h+=`<div style="margin-top:16px;"><div class="rubric-formula" style="border-left-color:var(--tier-s);">Composite = `;
+  h+=CATEGORIES.map(c=>`${Math.round(calcCategoryScore(town,c))}×${weights[c]}%`).join(' + ');
+  h+=` = <strong style="color:${color};">${comp.toFixed(1)}</strong> → <strong style="color:${color};">${tier} Tier</strong></div></div>`;
+
+  // Commute
+  if (d&&d.commute) {
+    h+=`<div class="detail-section"><h4>Commute Details</h4>`;
+    h+=`<div class="commute-card"><div class="dest">→ 10 Fan Pier Blvd (Seaport)</div><div class="route">${d.commute.fanPier.mode}</div><div class="time">${d.commute.fanPier.time}</div></div>`;
+    h+=`<div class="commute-card"><div class="dest">→ 960 Mass Ave (South End)</div><div class="route">${d.commute.massAve.mode}</div><div class="time">${d.commute.massAve.time}</div></div>`;
+    if(d.commute.stations) h+=`<div style="font-size:12px;color:var(--text-dim);margin-top:8px;">Stations: ${Array.isArray(d.commute.stations)?d.commute.stations.join(', '):d.commute.stations}</div>`;
+    if(d.commute.bonus) h+=`<div style="font-size:12px;color:var(--accent);margin-top:4px;">Bonus: ${d.commute.bonus}</div>`;
+    h+=`</div>`;
+  }
+
+  // Overrides
+  h+=`<div class="detail-section"><h4>Override Scores</h4><div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Adjust any category. Overrides replace formula scores. Political scores are estimates — override if you know the real numbers.</div>`;
+  for (const cat of CATEGORIES) {
+    const s=calcCategoryScore(town,cat), isOv=town.overrides[cat]!==undefined;
+    h+=`<div class="override-row"><label>${CAT_LABELS[cat]}</label>
+      <input type="range" min="0" max="100" value="${Math.round(s)}" oninput="setOverride('${town.id}','${cat}',this.value)" id="override-${town.id}-${cat}">
+      <div class="val" id="override-val-${town.id}-${cat}">${Math.round(s)}</div>
+      ${isOv?`<button class="override-btn" onclick="event.stopPropagation();clearOverride('${town.id}','${cat}')">Reset</button>`:''}
+    </div>`;
+  }
+  h+=`</div>`;
+
+  document.getElementById('detail-body').innerHTML=h;
+  document.getElementById('detail-panel').classList.add('open');
+}
+function toggleRubric(tid,cat){const c=document.getElementById(`rubric-${tid}-${cat}`);if(c)c.classList.toggle('open');}
+function closeDetail(){document.getElementById('detail-panel').classList.remove('open');}
+function setOverride(tid,cat,v){const t=towns.find(x=>x.id===tid);if(t){t.overrides[cat]=parseInt(v);document.getElementById(`override-val-${tid}-${cat}`).textContent=v;}}
+function clearOverride(tid,cat){const t=towns.find(x=>x.id===tid);if(t){delete t.overrides[cat];render();openDetail(tid);}}
+
+// ===== CONTROLS =====
+function setView(v){currentView=v;document.querySelectorAll('.view-toggle button').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.view-toggle button').forEach(b=>{if(b.textContent.toLowerCase().includes(v))b.classList.add('active');});render();}
+function sortBy(c){if(sortCol===c)sortDir*=-1;else{sortCol=c;sortDir=-1;}render();}
+function applyFilters(){visibleTiers.clear();document.querySelectorAll('[data-tier]').forEach(cb=>{if(cb.checked)visibleTiers.add(cb.dataset.tier);});render();}
+function updateWeights(){
+  for(const c of CATEGORIES){const s=document.getElementById(`w-${c}`);if(s){weights[c]=parseInt(s.value);document.getElementById(`w-${c}-val`).textContent=s.value+'%';}}
+  const t=Object.values(weights).reduce((a,b)=>a+b,0);const e=document.getElementById('weight-total');e.textContent=t+'%';e.style.color=t===100?'var(--accent)':'#f87171';render();
+}
+function exportData(){
+  const d=towns.map(t=>({name:t.name,tier:getTier(calcComposite(t)),composite:calcComposite(t),categories:Object.fromEntries(CATEGORIES.map(c=>[c,{score:calcCategoryScore(t,c),submetrics:t.rubric[c].submetrics}])),overrides:{...t.overrides}}));
+  const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='town-rankings.json';a.click();URL.revokeObjectURL(u);
+}
+function showAddTown(){
+  const n=prompt('Town name:');if(!n)return;const id=n.toLowerCase().replace(/\s+/g,'-');
+  if(towns.find(t=>t.id===id)){alert('Already exists!');return;}
+  const dr={};for(const c of CATEGORIES)dr[c]={submetrics:[{name:'Score',weight:1.0,raw:'Not scored',formula:'Manual',score:50}]};
+  towns.push({id,name:n,county:'TBD',overrides:{},rubric:dr,details:{commute:{fanPier:{mode:'TBD',time:'TBD'},massAve:{mode:'TBD',time:'TBD'},stations:['TBD'],line:'TBD'}}});
+  render();openDetail(id);
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDetail();});
+document.addEventListener('click',e=>{const p=document.getElementById('detail-panel');if(p.classList.contains('open')&&!p.contains(e.target)&&!e.target.closest('.town-card')&&!e.target.closest('tr'))closeDetail();});
+render();
+</script>
+</body>
+</html>
