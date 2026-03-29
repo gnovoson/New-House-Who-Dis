@@ -103,6 +103,23 @@
   /* Comparison table */
   .compare-view { display:none; height:calc(100vh - 65px); overflow:auto; }
   .compare-view.active { display:block; }
+
+  /* Filter bar */
+  .filter-bar { display:flex; flex-wrap:wrap; gap:10px; padding:14px 20px; border-bottom:1px solid var(--border); background:var(--surface); align-items:center; }
+  .filter-bar label { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-dim); margin-right:2px; }
+  .filter-group { display:flex; align-items:center; gap:5px; }
+  .filter-bar select, .filter-bar input[type="number"] {
+    background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:6px;
+    padding:5px 8px; font-size:12px; min-width:70px;
+  }
+  .filter-bar select:focus, .filter-bar input:focus { outline:none; border-color:var(--accent); }
+  .filter-bar .filter-chip { display:inline-flex; align-items:center; gap:3px; padding:4px 10px; border-radius:14px;
+    font-size:11px; font-weight:600; cursor:pointer; border:1px solid var(--border); background:var(--surface2); color:var(--text-dim); transition:all .15s; user-select:none; }
+  .filter-bar .filter-chip.active { border-color:var(--accent); background:var(--accent-glow); color:var(--accent); }
+  .filter-bar .filter-chip:hover { border-color:var(--accent); }
+  .filter-reset { font-size:11px; color:var(--red); cursor:pointer; margin-left:auto; padding:4px 10px; border-radius:6px; border:1px solid transparent; }
+  .filter-reset:hover { border-color:var(--red); background:rgba(248,113,113,.08); }
+  .filter-count { font-size:12px; color:var(--text-dim); margin-left:6px; }
   .main.hidden { display:none; }
 
   .compare-table { border-collapse:collapse; width:100%; font-size:12px; }
@@ -766,6 +783,138 @@ let compareVisible = false;
 let sortCol = 'houseScore';
 let sortDir = -1; // -1 = descending
 
+// ===== FILTERS =====
+const defaultFilters = () => ({
+  townTiers: [],        // empty = all; ['S','A'] = only S and A tier towns
+  houseTiers: [],       // same for house tiers
+  mustHavePass: 'any',  // 'any' | 'all' | 'none'
+  minPrice: '', maxPrice: '',
+  minBeds: '', minBaths: '',
+  ac: 'any',            // 'any' | 'yes' | 'no'
+  garage: 'any',        // 'any' | 'yes' | 'no'
+  heating: 'any',       // 'any' | 'gas' | 'oil' | 'electric' | 'other'
+  town: 'any',          // 'any' or town id
+});
+let filters = defaultFilters();
+
+function applyFilters(rows) {
+  return rows.filter(r => {
+    if (filters.townTiers.length && !filters.townTiers.includes(r.townTier)) return false;
+    if (filters.houseTiers.length && !filters.houseTiers.includes(r.houseTier)) return false;
+    if (filters.mustHavePass === 'all' && r.mustFails > 0) return false;
+    if (filters.mustHavePass === 'none' && r.mustFails === 0) return false;
+    if (filters.minPrice && r.price < Number(filters.minPrice)) return false;
+    if (filters.maxPrice && r.price > Number(filters.maxPrice)) return false;
+    if (filters.minBeds && r.beds < Number(filters.minBeds)) return false;
+    if (filters.minBaths && r.baths < Number(filters.minBaths)) return false;
+    if (filters.ac === 'yes' && r.ac !== 'Yes') return false;
+    if (filters.ac === 'no' && r.ac !== 'No') return false;
+    if (filters.garage === 'yes' && !r.garage) return false;
+    if (filters.garage === 'no' && r.garage > 0) return false;
+    if (filters.heating !== 'any') {
+      const ht = (r.heating || '').toLowerCase();
+      if (filters.heating === 'gas' && !ht.includes('gas')) return false;
+      if (filters.heating === 'oil' && !ht.includes('oil')) return false;
+      if (filters.heating === 'electric' && !ht.includes('electric')) return false;
+      if (filters.heating === 'other' && (ht.includes('gas') || ht.includes('oil') || ht.includes('electric'))) return false;
+    }
+    if (filters.town !== 'any' && r.h.townId !== filters.town) return false;
+    return true;
+  });
+}
+
+function onFilterChange() { renderCompareTable(); }
+function resetFilters() { filters = defaultFilters(); renderCompareTable(); }
+function toggleTierFilter(type, tier) {
+  const arr = type === 'town' ? filters.townTiers : filters.houseTiers;
+  const idx = arr.indexOf(tier);
+  if (idx >= 0) arr.splice(idx, 1); else arr.push(tier);
+  renderCompareTable();
+}
+
+function buildFilterBar(totalRows, filteredCount) {
+  // Collect unique towns from listings
+  const towns = [...new Set(listings.map(h => h.townId))].sort()
+    .map(id => ({ id, name: TOWN_SCORES[id]?.name || id }));
+
+  let fb = '<div class="filter-bar">';
+
+  // Town tier chips
+  fb += '<div class="filter-group"><label>Town Tier</label>';
+  for (const t of ['S','A','B','C','D']) {
+    const active = filters.townTiers.includes(t) ? 'active' : '';
+    fb += `<span class="filter-chip ${active}" onclick="toggleTierFilter('town','${t}')">${t}</span>`;
+  }
+  fb += '</div>';
+
+  // House tier chips
+  fb += '<div class="filter-group"><label>House Tier</label>';
+  for (const t of ['S','A','B','C','D']) {
+    const active = filters.houseTiers.includes(t) ? 'active' : '';
+    fb += `<span class="filter-chip ${active}" onclick="toggleTierFilter('house','${t}')">${t}</span>`;
+  }
+  fb += '</div>';
+
+  // Must-haves
+  fb += '<div class="filter-group"><label>Must-Haves</label>';
+  fb += `<select onchange="filters.mustHavePass=this.value;onFilterChange()">`;
+  for (const [v, l] of [['any','Any'],['all','All pass'],['none','Has fails']]) {
+    fb += `<option value="${v}" ${filters.mustHavePass===v?'selected':''}>${l}</option>`;
+  }
+  fb += '</select></div>';
+
+  // Price range
+  fb += '<div class="filter-group"><label>Price</label>';
+  fb += `<input type="number" placeholder="Min" step="50000" style="width:90px" value="${filters.minPrice}" onchange="filters.minPrice=this.value;onFilterChange()">`;
+  fb += `<span style="color:var(--text-dim);">–</span>`;
+  fb += `<input type="number" placeholder="Max" step="50000" style="width:90px" value="${filters.maxPrice}" onchange="filters.maxPrice=this.value;onFilterChange()">`;
+  fb += '</div>';
+
+  // Beds
+  fb += '<div class="filter-group"><label>Beds ≥</label>';
+  fb += `<input type="number" min="0" max="10" style="width:55px" value="${filters.minBeds}" onchange="filters.minBeds=this.value;onFilterChange()">`;
+  fb += '</div>';
+
+  // AC
+  fb += '<div class="filter-group"><label>AC</label>';
+  fb += `<select onchange="filters.ac=this.value;onFilterChange()">`;
+  for (const [v, l] of [['any','Any'],['yes','Yes'],['no','No']]) {
+    fb += `<option value="${v}" ${filters.ac===v?'selected':''}>${l}</option>`;
+  }
+  fb += '</select></div>';
+
+  // Garage
+  fb += '<div class="filter-group"><label>Garage</label>';
+  fb += `<select onchange="filters.garage=this.value;onFilterChange()">`;
+  for (const [v, l] of [['any','Any'],['yes','Has garage'],['no','No garage']]) {
+    fb += `<option value="${v}" ${filters.garage===v?'selected':''}>${l}</option>`;
+  }
+  fb += '</select></div>';
+
+  // Heating
+  fb += '<div class="filter-group"><label>Heat</label>';
+  fb += `<select onchange="filters.heating=this.value;onFilterChange()">`;
+  for (const [v, l] of [['any','Any'],['gas','Gas'],['oil','Oil'],['electric','Electric'],['other','Other']]) {
+    fb += `<option value="${v}" ${filters.heating===v?'selected':''}>${l}</option>`;
+  }
+  fb += '</select></div>';
+
+  // Town dropdown
+  fb += '<div class="filter-group"><label>Town</label>';
+  fb += `<select onchange="filters.town=this.value;onFilterChange()">`;
+  fb += `<option value="any">All towns</option>`;
+  for (const t of towns) {
+    fb += `<option value="${t.id}" ${filters.town===t.id?'selected':''}>${t.name}</option>`;
+  }
+  fb += '</select></div>';
+
+  // Count + reset
+  fb += `<span class="filter-count">${filteredCount}/${totalRows} listings</span>`;
+  fb += `<span class="filter-reset" onclick="resetFilters()">Reset filters</span>`;
+  fb += '</div>';
+  return fb;
+}
+
 function toggleCompare() {
   compareVisible = !compareVisible;
   document.getElementById('btn-compare').textContent = compareVisible ? 'Card View' : 'Compare Table';
@@ -821,8 +970,12 @@ function renderCompareTable() {
     };
   });
 
+  // Filter
+  const totalRows = rows.length;
+  const filtered = applyFilters(rows);
+
   // Sort
-  rows.sort((a, b) => {
+  filtered.sort((a, b) => {
     let av = a[sortCol], bv = b[sortCol];
     if (typeof av === 'string') return sortDir * av.localeCompare(bv);
     return sortDir * ((av||0) - (bv||0));
@@ -834,7 +987,8 @@ function renderCompareTable() {
   };
   const thCls = (col) => sortCol === col ? 'sorted' : '';
 
-  let html = '<table class="compare-table"><thead><tr>';
+  let html = buildFilterBar(totalRows, filtered.length);
+  html += '<table class="compare-table"><thead><tr>';
   const cols = [
     ['address','Address'],['town','Town'],['price','Price'],
     ['beds','Beds'],['baths','Baths'],['sqft','Sqft'],['year','Year'],
@@ -856,7 +1010,7 @@ function renderCompareTable() {
   }
   html += '</tr></thead><tbody>';
 
-  for (const r of rows) {
+  for (const r of filtered) {
     const hc = getTierColor(r.houseTier);
     const tc = getTierColor(r.townTier);
 
@@ -976,8 +1130,7 @@ async function autoLoadListings() {
 document.addEventListener('keydown', e => { if(e.key==='Escape' && mode==='form') cancelForm(); });
 showEmpty();
 autoLoadListings().then(() => {
-  toggleCompare();
-}).catch(() => {
+  // Always open to compare table view by default
   toggleCompare();
 });
 </script>
