@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home Town Ranker</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
   :root {
     --bg: #0f1117; --surface: #1a1d27; --surface2: #232736; --border: #2e3345;
@@ -107,6 +109,18 @@
   .override-btn { font-size:11px; padding:4px 10px; border-radius:4px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer; }
   .override-btn:hover { border-color:var(--accent); color:var(--accent); }
   .tier-s{background:rgba(255,107,157,.15);color:var(--tier-s)}.tier-a{background:rgba(192,132,252,.15);color:var(--tier-a)}.tier-b{background:rgba(108,123,255,.15);color:var(--tier-b)}.tier-c{background:rgba(56,189,248,.15);color:var(--tier-c)}.tier-d{background:rgba(52,211,153,.15);color:var(--tier-d)}.tier-e{background:rgba(251,191,36,.15);color:var(--tier-e)}.tier-f{background:rgba(248,113,113,.15);color:var(--tier-f)}
+  /* Map view */
+  #map-container { width:100%; height:calc(100vh - 160px); min-height:400px; border-radius:10px; overflow:hidden; }
+  .map-popup { font-family:inherit; }
+  .map-popup .popup-name { font-size:15px; font-weight:700; margin-bottom:2px; }
+  .map-popup .popup-score { font-size:13px; margin-bottom:6px; }
+  .map-popup .popup-tier { display:inline-block; padding:2px 8px; border-radius:4px; font-weight:700; font-size:12px; }
+  .map-popup .popup-cats { font-size:11px; color:#666; line-height:1.6; margin-top:4px; }
+  .map-popup .popup-link { font-size:12px; color:#6c7bff; cursor:pointer; margin-top:6px; display:inline-block; }
+  .map-legend { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; line-height:1.8; }
+  .map-legend h4 { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-dim); margin-bottom:6px; }
+  .map-legend .legend-row { display:flex; align-items:center; gap:8px; font-size:12px; }
+  .map-legend .legend-dot { width:14px; height:14px; border-radius:50%; flex-shrink:0; }
   @media(max-width:900px){.sidebar{display:none}.detail-overlay{width:100%}}
 </style>
 </head>
@@ -147,6 +161,7 @@
     <div class="view-toggle">
       <button class="active" onclick="setView('tier')">Tier List</button>
       <button onclick="setView('table')">Table</button>
+      <button onclick="setView('map')">Map</button>
     </div>
     <div id="view-container"></div>
   </div>
@@ -1021,7 +1036,14 @@ function renderTableView(filtered) {
 }
 function render() {
   const f=towns.filter(t=>visibleTiers.has(getTier(calcComposite(t))));
-  document.getElementById('view-container').innerHTML=currentView==='tier'?renderTierView(f):renderTableView(f);
+  if (currentView==='map') {
+    document.getElementById('view-container').innerHTML = renderMapView(f);
+    // Slight delay to ensure container is in DOM before Leaflet init
+    setTimeout(() => initMap(f), 50);
+  } else {
+    if (mapInstance) { mapInstance.remove(); mapInstance = null; }
+    document.getElementById('view-container').innerHTML=currentView==='tier'?renderTierView(f):renderTableView(f);
+  }
 }
 
 // ===== DETAIL PANEL =====
@@ -1097,8 +1119,140 @@ function closeDetail(){document.getElementById('detail-panel').classList.remove(
 function setOverride(tid,cat,v){const t=towns.find(x=>x.id===tid);if(t){t.overrides[cat]=parseInt(v);document.getElementById(`override-val-${tid}-${cat}`).textContent=v;}}
 function clearOverride(tid,cat){const t=towns.find(x=>x.id===tid);if(t){delete t.overrides[cat];render();openDetail(tid);}}
 
+// ===== MAP VIEW =====
+const TOWN_COORDS = {
+  newton:[42.337,-71.209], arlington:[42.416,-71.156], belmont:[42.396,-71.178],
+  milton:[42.250,-71.072], dedham:[42.242,-71.167], needham:[42.280,-71.233],
+  wellesley:[42.297,-71.292], hingham:[42.241,-70.890], watertown:[42.370,-71.183],
+  westwood:[42.215,-71.224], natick:[42.285,-71.350], duxbury:[42.041,-70.674],
+  franklin:[42.084,-71.397], scituate:[42.195,-70.726], quincy:[42.253,-71.002],
+  canton:[42.157,-71.145], hanover:[42.113,-70.812], waltham:[42.376,-71.236],
+  braintree:[42.204,-70.999], walpole:[42.142,-71.249], medfield:[42.187,-71.307],
+  dover:[42.228,-71.283], weston:[42.367,-71.303], norwood:[42.188,-71.200],
+  norfolk:[42.120,-71.324], cohasset:[42.242,-70.804], sharon:[42.124,-71.179],
+  foxborough:[42.065,-71.248], sherborn:[42.239,-71.370], marshfield:[42.092,-70.707],
+  medway:[42.142,-71.396], randolph:[42.163,-71.041], mansfield:[42.033,-71.218],
+  weymouth:[42.221,-70.940], holliston:[42.200,-71.424], rockland:[42.131,-70.907],
+  bridgewater:[41.990,-70.975], avon:[42.131,-71.043], hopkinton:[42.229,-71.522],
+  framingham:[42.280,-71.417], hull:[42.302,-70.858], abington:[42.105,-70.946],
+  norwell:[42.162,-70.793], ashland:[42.261,-71.463], whitman:[42.081,-70.934],
+  millis:[42.172,-71.358], holbrook:[42.153,-71.009], stoughton:[42.125,-71.098],
+  grafton:[42.207,-71.686], easton:[42.025,-71.129], plainville:[42.004,-71.333],
+  wrentham:[42.065,-71.330], upton:[42.175,-71.603], raynham:[41.949,-71.044],
+  attleboro:[41.945,-71.286], bellingham:[42.087,-71.475]
+};
+
+let mapInstance = null;
+let mapMarkers = [];
+
+function renderMapView(filtered) {
+  return '<div id="map-container"></div>';
+}
+
+function initMap(filtered) {
+  if (mapInstance) { mapInstance.remove(); mapInstance = null; }
+  mapMarkers = [];
+
+  const container = document.getElementById('map-container');
+  if (!container) return;
+
+  mapInstance = L.map('map-container', {
+    center: [42.18, -71.15],
+    zoom: 10,
+    zoomControl: true,
+  });
+
+  // Dark tile layer matching the app theme
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    maxZoom: 18
+  }).addTo(mapInstance);
+
+  // Add town markers
+  const bounds = [];
+  for (const t of filtered) {
+    const coords = TOWN_COORDS[t.id];
+    if (!coords) continue;
+
+    const comp = calcComposite(t);
+    const tier = getTier(comp);
+    const color = getTierColor(tier);
+
+    // Circle marker sized by score
+    const radius = 8 + (comp - 40) * 0.25;
+    const marker = L.circleMarker(coords, {
+      radius: radius,
+      fillColor: color,
+      color: '#000',
+      weight: 1.5,
+      opacity: 0.9,
+      fillOpacity: 0.7,
+    }).addTo(mapInstance);
+
+    // Tooltip (hover)
+    marker.bindTooltip(`<strong>${t.name}</strong> — ${tier} Tier (${comp.toFixed(1)})`, {
+      direction: 'top', offset: [0, -radius],
+      className: 'map-tooltip'
+    });
+
+    // Popup (click)
+    const catRows = CATEGORIES.map(c => {
+      const s = Math.round(calcCategoryScore(t, c));
+      return `${CAT_LABELS[c]}: <strong>${s}</strong>`;
+    }).join(' · ');
+
+    marker.bindPopup(`
+      <div class="map-popup">
+        <div class="popup-name">${t.name}</div>
+        <div class="popup-score">
+          <span class="popup-tier" style="background:${color}22;color:${color};">${tier} Tier</span>
+          &nbsp; ${comp.toFixed(1)} pts
+        </div>
+        <div class="popup-cats">${catRows}</div>
+        <div class="popup-link" onclick="closeMapPopups();openDetail('${t.id}')">View full breakdown →</div>
+      </div>
+    `, { maxWidth: 360 });
+
+    // Town name label
+    L.marker(coords, {
+      icon: L.divIcon({
+        className: 'map-label',
+        html: `<div style="font-size:11px;font-weight:600;color:${color};text-shadow:0 0 4px #000,0 0 4px #000,0 0 2px #000;white-space:nowrap;pointer-events:none;transform:translate(-50%,8px);">${t.name}</div>`,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+      }),
+      interactive: false
+    }).addTo(mapInstance);
+
+    mapMarkers.push(marker);
+    bounds.push(coords);
+  }
+
+  if (bounds.length) {
+    mapInstance.fitBounds(bounds, { padding: [30, 30] });
+  }
+
+  // Legend control
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = function() {
+    const div = L.DomUtil.create('div', 'map-legend');
+    div.innerHTML = '<h4>Tiers</h4>' +
+      ['S','A','B','C','D','E','F'].map(t => {
+        const c = getTierColor(t);
+        const range = t==='S'?'78+':t==='A'?'72-77':t==='B'?'66-71':t==='C'?'60-65':t==='D'?'54-59':t==='E'?'48-53':'<48';
+        return `<div class="legend-row"><div class="legend-dot" style="background:${c};"></div>${t} Tier (${range})</div>`;
+      }).join('');
+    return div;
+  };
+  legend.addTo(mapInstance);
+}
+
+function closeMapPopups() {
+  if (mapInstance) mapInstance.closePopup();
+}
+
 // ===== CONTROLS =====
-function setView(v){currentView=v;document.querySelectorAll('.view-toggle button').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.view-toggle button').forEach(b=>{if(b.textContent.toLowerCase().includes(v))b.classList.add('active');});render();}
+function setView(v){currentView=v;document.querySelectorAll('.view-toggle button').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.view-toggle button').forEach(b=>{if(b.textContent.toLowerCase().replace(/\s/g,'').includes(v))b.classList.add('active');});render();}
 function sortBy(c){if(sortCol===c)sortDir*=-1;else{sortCol=c;sortDir=-1;}render();}
 function applyFilters(){visibleTiers.clear();document.querySelectorAll('[data-tier]').forEach(cb=>{if(cb.checked)visibleTiers.add(cb.dataset.tier);});render();}
 function updateWeights(){
